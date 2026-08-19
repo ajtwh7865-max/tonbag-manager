@@ -7,71 +7,398 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  /* (기존 CSS 스타일 동일하므로 그대로 둡니다) */
   :root{
-    --bg:#EEF1EF; --surface:#FFFFFF; --ink:#1F2A24; --muted:#5C6B63;
-    --accent-in:#D9480F; --full:#D9480F; --half:#E8A33D; --empty:#7E8A96;
-    --border:#D7DBD4; --danger:#B3261E;
+    --bg:#EEF1EF;
+    --surface:#FFFFFF;
+    --ink:#1F2A24;
+    --muted:#5C6B63;
+    --accent-in:#D9480F;
+    --full:#D9480F;
+    --half:#E8A33D;
+    --empty:#7E8A96;
+    --border:#D7DBD4;
+    --danger:#B3261E;
   }
   *{box-sizing:border-box;}
-  body{margin:0; background:var(--bg); color:var(--ink); font-family:'Inter',sans-serif; -webkit-font-smoothing:antialiased;}
-  .wrap{max-width:1020px; margin:0 auto; padding:28px 20px 60px;}
-  header{display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:22px; border-bottom:3px solid var(--ink); padding-bottom:14px;}
-  .eyebrow{font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.12em; color:var(--muted); text-transform:uppercase;}
-  h1{font-family:'Oswald',sans-serif; font-weight:700; font-size:30px; letter-spacing:0.01em; margin:2px 0 0;}
-  .subtitle{font-size:13px; color:var(--muted);}
-  .stats{display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-bottom:24px;}
-  .stat-card{background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:14px 12px 12px; display:flex; align-items:center; gap:10px;}
-  .stat-card .num{font-family:'Oswald',sans-serif; font-size:26px; font-weight:600; line-height:1;}
-  .stat-card .label{font-size:10.5px; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em; margin-top:3px;}
-  .stat-card.total .num{color:var(--ink);} .stat-card.full .num{color:var(--full);}
-  .stat-card.half .num{color:var(--half);} .stat-card.empty .num{color:var(--empty);}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{
+    max-width:1020px;
+    margin:0 auto;
+    padding:28px 20px 60px;
+  }
+  header{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:8px;
+    margin-bottom:22px;
+    border-bottom:3px solid var(--ink);
+    padding-bottom:14px;
+  }
+  .eyebrow{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    letter-spacing:0.12em;
+    color:var(--muted);
+    text-transform:uppercase;
+  }
+  h1{
+    font-family:'Oswald',sans-serif;
+    font-weight:700;
+    font-size:30px;
+    letter-spacing:0.01em;
+    margin:2px 0 0;
+  }
+  .subtitle{
+    font-size:13px;
+    color:var(--muted);
+  }
+
+  /* ---- Stats ---- */
+  .stats{
+    display:grid;
+    grid-template-columns:repeat(5,1fr);
+    gap:12px;
+    margin-bottom:24px;
+  }
+  .stat-card{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:6px;
+    padding:14px 12px 12px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .stat-card .num{
+    font-family:'Oswald',sans-serif;
+    font-size:26px;
+    font-weight:600;
+    line-height:1;
+  }
+  .stat-card .label{
+    font-size:10.5px;
+    color:var(--muted);
+    text-transform:uppercase;
+    letter-spacing:0.04em;
+    margin-top:3px;
+  }
+  .stat-card.total .num{color:var(--ink);}
+  .stat-card.full .num{color:var(--full);}
+  .stat-card.half .num{color:var(--half);}
+  .stat-card.empty .num{color:var(--empty);}
   .stat-card.calc .num{color:var(--ink);}
-  .panel{background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:18px; margin-bottom:24px;}
-  .panel-title{font-family:'Oswald',sans-serif; font-size:15px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:14px;}
-  .form-grid{display:grid; grid-template-columns:1fr 1.6fr 1fr; gap:14px; align-items:end;}
-  .field label{display:block; font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;}
-  .type-toggle{display:flex; gap:6px;}
-  .type-toggle button{flex:1; padding:10px 0; border-radius:6px; border:1.5px solid var(--border); background:#fff; font-weight:600; font-size:12.5px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px; white-space:nowrap;}
-  .type-toggle button.active[data-type="full"]{background:rgba(217,72,15,0.1); border-color:var(--full); color:var(--full);}
-  .type-toggle button.active[data-type="half"]{background:rgba(232,163,61,0.15); border-color:var(--half); color:#8a5c0f;}
-  .type-toggle button.active[data-type="empty"]{background:rgba(126,138,150,0.15); border-color:var(--empty); color:#4b545c;}
-  .qty-stepper{display:flex; align-items:center; border:1.5px solid var(--border); border-radius:6px; overflow:hidden;}
-  .qty-stepper button{width:38px; height:40px; border:none; background:var(--bg); font-size:18px; font-weight:600; cursor:pointer; color:var(--ink);}
-  .qty-stepper input{flex:1; border:none; text-align:center; font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:600; padding:8px 4px; width:100%; min-width:0;}
+
+  /* ---- Panel ---- */
+  .panel{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:18px;
+    margin-bottom:24px;
+  }
+  .panel-title{
+    font-family:'Oswald',sans-serif;
+    font-size:15px;
+    font-weight:600;
+    text-transform:uppercase;
+    letter-spacing:0.04em;
+    margin-bottom:14px;
+  }
+
+  .form-grid{
+    display:grid;
+    grid-template-columns:1fr 1.6fr 1fr;
+    gap:14px;
+    align-items:end;
+  }
+  .field label{
+    display:block;
+    font-size:11px;
+    color:var(--muted);
+    text-transform:uppercase;
+    letter-spacing:0.05em;
+    margin-bottom:6px;
+  }
+  .type-toggle{
+    display:flex;
+    gap:6px;
+  }
+  .type-toggle button{
+    flex:1;
+    padding:10px 0;
+    border-radius:6px;
+    border:1.5px solid var(--border);
+    background:#fff;
+    font-weight:600;
+    font-size:12.5px;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:5px;
+    white-space:nowrap;
+  }
+  .type-toggle button.active[data-type="full"]{
+    background:rgba(217,72,15,0.1);
+    border-color:var(--full);
+    color:var(--full);
+  }
+  .type-toggle button.active[data-type="half"]{
+    background:rgba(232,163,61,0.15);
+    border-color:var(--half);
+    color:#8a5c0f;
+  }
+  .type-toggle button.active[data-type="empty"]{
+    background:rgba(126,138,150,0.15);
+    border-color:var(--empty);
+    color:#4b545c;
+  }
+  .qty-stepper{
+    display:flex;
+    align-items:center;
+    border:1.5px solid var(--border);
+    border-radius:6px;
+    overflow:hidden;
+  }
+  .qty-stepper button{
+    width:38px;
+    height:40px;
+    border:none;
+    background:var(--bg);
+    font-size:18px;
+    font-weight:600;
+    cursor:pointer;
+    color:var(--ink);
+  }
+  .qty-stepper input{
+    flex:1;
+    border:none;
+    text-align:center;
+    font-family:'JetBrains Mono',monospace;
+    font-size:16px;
+    font-weight:600;
+    padding:8px 4px;
+    width:100%;
+    min-width:0;
+  }
   .qty-stepper input:focus{outline:none;}
-  input[type="date"], input[type="text"]{width:100%; padding:10px 10px; border:1.5px solid var(--border); border-radius:6px; font-family:'Inter',sans-serif; font-size:14px; color:var(--ink); background:#fff;}
-  input[type="date"]:focus, input[type="text"]:focus{outline:none; border-color:var(--ink);}
-  .full-row{grid-column:1 / -1;}
-  .submit-btn{margin-top:16px; width:100%; padding:13px 0; border:none; border-radius:6px; font-family:'Oswald',sans-serif; font-weight:600; font-size:15px; letter-spacing:0.03em; color:#fff; cursor:pointer; background:var(--accent-in); transition:opacity .12s ease;}
-  .submit-btn:hover{opacity:0.9;} .submit-btn:active{opacity:0.8;}
-  .submit-btn:disabled{background:var(--muted); cursor:not-allowed;}
-  .hint{font-size:12px; color:var(--danger); margin-top:8px; min-height:16px;}
-  .log-header{display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;}
-  .clear-btn{padding:7px 14px; border-radius:20px; border:1.5px solid var(--danger); background:#fff; font-size:12px; font-weight:600; color:var(--danger); cursor:pointer; transition:all .12s ease;}
-  .clear-btn.confirming{background:var(--danger); color:#fff;}
-  .clear-btn:disabled{opacity: 0.5; cursor:not-allowed;}
-  table{width:100%; border-collapse:collapse; background:var(--surface); border:1px solid var(--border); border-radius:8px; overflow:hidden; font-size:13px;}
-  thead th{text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted); padding:10px 12px; background:var(--bg); border-bottom:1px solid var(--border);}
-  tbody td{padding:10px 12px; border-bottom:1px solid var(--border); font-family:'JetBrains Mono',monospace; font-size:12.5px; vertical-align:middle;}
+  input[type="date"], input[type="text"]{
+    width:100%;
+    padding:10px 10px;
+    border:1.5px solid var(--border);
+    border-radius:6px;
+    font-family:'Inter',sans-serif;
+    font-size:14px;
+    color:var(--ink);
+    background:#fff;
+  }
+  input[type="date"]:focus, input[type="text"]:focus{
+    outline:none;
+    border-color:var(--ink);
+  }
+  .full-row{
+    grid-column:1 / -1;
+  }
+  .submit-btn{
+    margin-top:16px;
+    width:100%;
+    padding:13px 0;
+    border:none;
+    border-radius:6px;
+    font-family:'Oswald',sans-serif;
+    font-weight:600;
+    font-size:15px;
+    letter-spacing:0.03em;
+    color:#fff;
+    cursor:pointer;
+    background:var(--accent-in);
+    transition:opacity .12s ease;
+  }
+  .submit-btn:hover{opacity:0.9;}
+  .submit-btn:active{opacity:0.8;}
+  .hint{
+    font-size:12px;
+    color:var(--danger);
+    margin-top:8px;
+    min-height:16px;
+  }
+
+  /* ---- Count breakdown ---- */
+  .count-grid{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:12px;
+  }
+  .count-card{
+    background:var(--bg);
+    border:1px solid var(--border);
+    border-radius:6px;
+    padding:12px;
+    text-align:center;
+  }
+  .count-card .cnum{
+    font-family:'Oswald',sans-serif;
+    font-size:22px;
+    font-weight:600;
+    line-height:1;
+  }
+  .count-card .clabel{
+    font-size:10.5px;
+    color:var(--muted);
+    text-transform:uppercase;
+    letter-spacing:0.04em;
+    margin-top:4px;
+  }
+  .count-card.full .cnum{color:var(--full);}
+  .count-card.half .cnum{color:var(--half);}
+  .count-card.empty .cnum{color:var(--empty);}
+  @media (max-width:640px){
+    .count-grid{grid-template-columns:repeat(2,1fr);}
+  }
+
+  /* ---- Memo stats ---- */
+  .memo-stats-table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:13px;
+  }
+  .memo-stats-table th{
+    text-align:left;
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:0.04em;
+    color:var(--muted);
+    padding:8px 10px;
+    background:var(--bg);
+    border-bottom:1px solid var(--border);
+  }
+  .memo-stats-table td{
+    padding:9px 10px;
+    border-bottom:1px solid var(--border);
+    font-family:'JetBrains Mono',monospace;
+    font-size:12.5px;
+  }
+  .memo-stats-table tr:last-child td{border-bottom:none;}
+  .memo-stats-table td.memo-name{
+    font-family:'Inter',sans-serif;
+    font-weight:600;
+  }
+  .memo-stats-table td.num-cell{
+    text-align:right;
+  }
+
+  /* ---- Log ---- */
+  .log-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:12px;
+    flex-wrap:wrap;
+    gap:8px;
+  }
+  .clear-btn{
+    padding:7px 14px;
+    border-radius:20px;
+    border:1.5px solid var(--danger);
+    background:#fff;
+    font-size:12px;
+    font-weight:600;
+    color:var(--danger);
+    cursor:pointer;
+    transition:all .12s ease;
+  }
+  .clear-btn.confirming{
+    background:var(--danger);
+    color:#fff;
+  }
+  table{
+    width:100%;
+    border-collapse:collapse;
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:8px;
+    overflow:hidden;
+    font-size:13px;
+  }
+  thead th{
+    text-align:left;
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:0.04em;
+    color:var(--muted);
+    padding:10px 12px;
+    background:var(--bg);
+    border-bottom:1px solid var(--border);
+  }
+  tbody td{
+    padding:10px 12px;
+    border-bottom:1px solid var(--border);
+    font-family:'JetBrains Mono',monospace;
+    font-size:12.5px;
+    vertical-align:middle;
+  }
   tbody tr:last-child td{border-bottom:none;}
   tbody tr:hover{background:#FAFAF8;}
   .no{color:var(--muted);}
-  .bagchip{display:inline-flex; align-items:center; gap:5px; font-weight:600;}
-  .memo-cell{font-family:'Inter',sans-serif; color:var(--muted); max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-  .del-btn{background:none; border:none; color:var(--muted); cursor:pointer; font-size:16px; padding:2px 6px; border-radius:4px;}
+  .bagchip{
+    display:inline-flex;
+    align-items:center;
+    gap:5px;
+    font-weight:600;
+  }
+  .memo-cell{
+    font-family:'Inter',sans-serif;
+    color:var(--muted);
+    max-width:220px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .del-btn{
+    background:none;
+    border:none;
+    color:var(--muted);
+    cursor:pointer;
+    font-size:16px;
+    padding:2px 6px;
+    border-radius:4px;
+  }
   .del-btn:hover{color:var(--danger); background:rgba(179,38,30,0.08);}
-  .empty-row td{text-align:center; color:var(--muted); font-family:'Inter',sans-serif; padding:30px 12px;}
-  .log-scroll{max-height:420px; overflow-y:auto; border-radius:8px;}
+  .empty-row td{
+    text-align:center;
+    color:var(--muted);
+    font-family:'Inter',sans-serif;
+    padding:30px 12px;
+  }
+  .log-scroll{
+    max-height:420px;
+    overflow-y:auto;
+    border-radius:8px;
+  }
   .log-scroll table{border-radius:0;}
   .log-scroll thead th{position:sticky; top:0; z-index:1;}
-  @media (max-width:760px){.stats{grid-template-columns:repeat(3,1fr);}}
-  @media (max-width:640px){.stats{grid-template-columns:repeat(2,1fr); .form-grid{grid-template-columns:1fr;} .memo-cell{max-width:100px;}}}
+
+  @media (max-width:760px){
+    .stats{grid-template-columns:repeat(3,1fr);}
+  }
+  @media (max-width:640px){
+    .stats{grid-template-columns:repeat(2,1fr);}
+    .form-grid{grid-template-columns:1fr;}
+    .memo-cell{max-width:100px;}
+  }
 </style>
 </head>
 <body>
-<!-- HTML 구조는 동일하므로 중략 없이 전체를 제공합니다 -->
 <div class="wrap">
+
   <header>
     <div>
       <div class="eyebrow">Bulk Bag Inventory</div>
@@ -81,15 +408,41 @@
   </header>
 
   <div class="stats">
-    <div class="stat-card total"><div><div class="num" id="statTotal">0</div><div class="label">총 재고 (개)</div></div></div>
-    <div class="stat-card full"><div><div class="num" id="statFull">0</div><div class="label">Full 재고</div></div></div>
-    <div class="stat-card half"><div><div class="num" id="statHalf">0</div><div class="label">Half 재고</div></div></div>
-    <div class="stat-card empty"><div><div class="num" id="statEmpty">0</div><div class="label">빈톤백 재고</div></div></div>
-    <div class="stat-card calc"><div><div class="num" id="statCalc">0</div><div class="label">환산 수량 (full=1)</div></div></div>
+    <div class="stat-card total">
+      <div>
+        <div class="num" id="statTotal">0</div>
+        <div class="label">총 재고 (개)</div>
+      </div>
+    </div>
+    <div class="stat-card full">
+      <div>
+        <div class="num" id="statFull">0</div>
+        <div class="label">Full 재고</div>
+      </div>
+    </div>
+    <div class="stat-card half">
+      <div>
+        <div class="num" id="statHalf">0</div>
+        <div class="label">Half 재고</div>
+      </div>
+    </div>
+    <div class="stat-card empty">
+      <div>
+        <div class="num" id="statEmpty">0</div>
+        <div class="label">빈톤백 재고</div>
+      </div>
+    </div>
+    <div class="stat-card calc">
+      <div>
+        <div class="num" id="statCalc">0</div>
+        <div class="label">환산 수량 (full=1)</div>
+      </div>
+    </div>
   </div>
 
   <div class="panel">
     <div class="panel-title">입고 등록</div>
+
     <div class="form-grid">
       <div class="field">
         <label>날짜</label>
@@ -116,9 +469,51 @@
         <input type="text" id="fMemo" placeholder="예: 3공장 반입, A현장 등">
       </div>
     </div>
+
     <div style="font-size:11.5px; color:var(--muted); margin-top:12px;">※ Full / Half로 등록하면 같은 수량만큼 빈톤백 재고에서 자동 차감됩니다.</div>
     <button class="submit-btn" id="submitBtn" onclick="submitEntry()">입고 등록</button>
     <div class="hint" id="formHint"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">등록 건수 (구분별)</div>
+    <div class="count-grid">
+      <div class="count-card total">
+        <div class="cnum" id="cntTotal">0</div>
+        <div class="clabel">총 등록 건수</div>
+      </div>
+      <div class="count-card full">
+        <div class="cnum" id="cntFull">0</div>
+        <div class="clabel">Full 건수</div>
+      </div>
+      <div class="count-card half">
+        <div class="cnum" id="cntHalf">0</div>
+        <div class="clabel">Half 건수</div>
+      </div>
+      <div class="count-card empty">
+        <div class="cnum" id="cntEmpty">0</div>
+        <div class="clabel">빈백 건수</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">메모별 통계</div>
+    <div class="log-scroll" style="max-height:none;">
+      <table class="memo-stats-table" id="memoStatsTable">
+        <thead>
+          <tr>
+            <th>메모</th>
+            <th style="text-align:right;">건수</th>
+            <th style="text-align:right;">Full</th>
+            <th style="text-align:right;">Half</th>
+            <th style="text-align:right;">빈백</th>
+            <th style="text-align:right;">합계 (개)</th>
+          </tr>
+        </thead>
+        <tbody id="memoStatsBody"></tbody>
+      </table>
+    </div>
   </div>
 
   <div class="panel">
@@ -130,7 +525,12 @@
       <table>
         <thead>
           <tr>
-            <th>No.</th><th>날짜</th><th>상태</th><th>수량</th><th>메모</th><th></th>
+            <th>No.</th>
+            <th>날짜</th>
+            <th>상태</th>
+            <th>수량</th>
+            <th>메모</th>
+            <th></th>
           </tr>
         </thead>
         <tbody id="logBody">
@@ -138,14 +538,11 @@
       </table>
     </div>
   </div>
+
 </div>
 
 <script>
-// ==========================================
-// 주의: 아래 SCRIPT_URL에 구글 앱스 스크립트 배포 URL을 꼭 넣으세요!
-// ==========================================
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwsFyIwWfIt0aprZi6lqTV-1J-A4NNxJY7okqL46-PO5FTD_xmbnUfZWqJUOpbDcUL9/exec';
-
+const STORAGE_KEY = 'tonbag_entries';
 const TYPE_LABELS = { full: 'Full', half: 'Half', empty: '빈백' };
 const TYPE_RATIO = { full: 1, half: 0.5, empty: 0 };
 const TYPE_COLOR_VAR = { full: '--full', half: '--half', empty: '--empty' };
@@ -159,21 +556,27 @@ function todayStr(){
   return d.toISOString().slice(0,10);
 }
 
-// 구글 시트에서 데이터 불러오기
 async function loadEntries(){
-  const tbody = document.getElementById('logBody');
-  tbody.innerHTML = `<tr class="empty-row"><td colspan="6">데이터를 불러오는 중입니다...</td></tr>`;
-  
   try{
-    const res = await fetch(SCRIPT_URL);
-    const data = await res.json();
-    entries = data;
+    const res = await window.storage.get(STORAGE_KEY, false);
+    entries = res && res.value ? JSON.parse(res.value) : [];
   }catch(e){
-    console.error("데이터 로드 실패:", e);
     entries = [];
   }
+  // guard against any legacy/unexpected type values
   entries = entries.filter(e => e && TYPE_LABELS[e.type]);
   render();
+}
+
+async function saveEntries(){
+  try{
+    const res = await window.storage.set(STORAGE_KEY, JSON.stringify(entries), false);
+    if(!res){
+      document.getElementById('formHint').textContent = '저장에 실패했습니다. 다시 시도해주세요.';
+    }
+  }catch(e){
+    document.getElementById('formHint').textContent = '저장 중 오류가 발생했습니다.';
+  }
 }
 
 function setType(type){
@@ -192,6 +595,8 @@ function stepQty(delta){
 }
 
 function getStock(){
+  // 빈톤백 입고는 빈톤백 재고를 늘리고, Full/Half 입고는 빈톤백을 채워서 쓰는 것이므로
+  // 빈톤백 재고에서 그만큼 차감한다.
   let full = 0, half = 0, empty = 0;
   entries.forEach(e=>{
     if(e.type === 'full'){ full += e.qty; empty -= e.qty; }
@@ -201,7 +606,6 @@ function getStock(){
   return { full, half, empty: Math.max(0, empty) };
 }
 
-// 구글 시트로 입고 데이터 전송하기
 async function submitEntry(){
   const hint = document.getElementById('formHint');
   hint.textContent = '';
@@ -235,44 +639,18 @@ async function submitEntry(){
     memo,
     createdAt: Date.now()
   };
+  entries.push(entry);
+  await saveEntries();
 
-  // UI 버튼 상태 변경 (중복 클릭 방지)
-  const submitBtn = document.getElementById('submitBtn');
-  submitBtn.disabled = true;
-  submitBtn.textContent = '저장 중...';
-
-  try {
-    await fetch(SCRIPT_URL, {
-      method: 'POST',
-      body: JSON.stringify({ action: 'insert', data: entry })
-    });
-    
-    entries.push(entry);
-    qtyEl.value = 1;
-    memoEl.value = '';
-    render();
-  } catch(e) {
-    hint.textContent = '구글 시트 저장에 실패했습니다.';
-  } finally {
-    submitBtn.disabled = false;
-    submitBtn.textContent = '입고 등록';
-  }
+  qtyEl.value = 1;
+  memoEl.value = '';
+  render();
 }
 
-// 구글 시트에서 개별 삭제
 async function deleteEntry(id){
-  // 낙관적 UI 업데이트 (화면에서 먼저 삭제)
   entries = entries.filter(e => e.id !== id);
+  await saveEntries();
   render();
-
-  try {
-    await fetch(SCRIPT_URL, {
-      method: 'POST',
-      body: JSON.stringify({ action: 'delete', id: id })
-    });
-  } catch(e) {
-    alert("삭제 중 오류가 발생했습니다. 새로고침 해주세요.");
-  }
 }
 
 function handleClearClick(){
@@ -292,25 +670,10 @@ function handleClearClick(){
   }
 }
 
-// 구글 시트 데이터 전체 삭제
 async function clearAllEntries(){
-  const btn = document.getElementById('clearBtn');
-  btn.disabled = true;
-  btn.textContent = '삭제 중...';
-
-  try {
-    await fetch(SCRIPT_URL, {
-      method: 'POST',
-      body: JSON.stringify({ action: 'clear' })
-    });
-    entries = [];
-    render();
-  } catch(e) {
-    alert("전체 삭제 중 오류가 발생했습니다.");
-  } finally {
-    btn.disabled = false;
-    btn.textContent = '전체삭제';
-  }
+  entries = [];
+  await saveEntries();
+  render();
 }
 
 function bagIcon(type, uid){
@@ -321,7 +684,11 @@ function bagIcon(type, uid){
   const rectY = bottom - filledH;
   const clipId = 'clip-' + uid;
   return `<svg width="16" height="16" viewBox="0 0 20 20" style="flex-shrink:0;">
-    <defs><clipPath id="${clipId}"><path d="M5 4 L15 4 L17 18 L3 18 Z"/></clipPath></defs>
+    <defs>
+      <clipPath id="${clipId}">
+        <path d="M5 4 L15 4 L17 18 L3 18 Z"/>
+      </clipPath>
+    </defs>
     <path d="M5 4 L15 4 L17 18 L3 18 Z" fill="none" stroke="${colorVar}" stroke-width="1.6" stroke-linejoin="round"/>
     <rect x="3" y="${rectY}" width="14" height="${filledH}" fill="${colorVar}" opacity="0.85" clip-path="url(#${clipId})"/>
   </svg>`;
@@ -338,13 +705,17 @@ function renderStats(){
 
 function renderLog(){
   const tbody = document.getElementById('logBody');
+
   if(entries.length === 0){
     tbody.innerHTML = `<tr class="empty-row"><td colspan="6">기록이 없습니다. 위에서 입고를 등록해보세요.</td></tr>`;
     return;
   }
+
+  // assign stable sequence numbers in chronological (ascending) order
   const chronological = entries.slice().sort((a,b)=> a.createdAt - b.createdAt);
   const noMap = {};
   chronological.forEach((e, idx)=>{ noMap[e.id] = idx + 1; });
+
   const list = entries.slice().sort((a,b)=> b.createdAt - a.createdAt);
 
   tbody.innerHTML = list.map(e=>{
@@ -361,8 +732,52 @@ function renderLog(){
   }).join('');
 }
 
+function renderCounts(){
+  // 등록 "건수" = 몇 번 입력했는지(레코드 개수). 재고 수량(qty 합계)과는 다른 지표입니다.
+  const counts = { full: 0, half: 0, empty: 0 };
+  entries.forEach(e=>{ if(counts.hasOwnProperty(e.type)) counts[e.type]++; });
+  document.getElementById('cntTotal').textContent = entries.length;
+  document.getElementById('cntFull').textContent = counts.full;
+  document.getElementById('cntHalf').textContent = counts.half;
+  document.getElementById('cntEmpty').textContent = counts.empty;
+}
+
+function renderMemoStats(){
+  const tbody = document.getElementById('memoStatsBody');
+  const groups = {}; // memoKey -> { count, full, half, empty, total }
+
+  entries.forEach(e=>{
+    const key = e.memo && e.memo.trim() ? e.memo.trim() : '(메모 없음)';
+    if(!groups[key]) groups[key] = { count:0, full:0, half:0, empty:0, total:0 };
+    groups[key].count += 1;
+    groups[key][e.type] += e.qty;
+    groups[key].total += e.qty;
+  });
+
+  const keys = Object.keys(groups).sort((a,b)=> groups[b].total - groups[a].total);
+
+  if(keys.length === 0){
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--muted); font-family:'Inter',sans-serif; padding:20px 10px;">기록이 없습니다.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = keys.map(key=>{
+    const g = groups[key];
+    return `<tr>
+      <td class="memo-name">${key}</td>
+      <td class="num-cell">${g.count}건</td>
+      <td class="num-cell">${g.full}</td>
+      <td class="num-cell">${g.half}</td>
+      <td class="num-cell">${g.empty}</td>
+      <td class="num-cell"><strong>${g.total}개</strong></td>
+    </tr>`;
+  }).join('');
+}
+
 function render(){
   renderStats();
+  renderCounts();
+  renderMemoStats();
   renderLog();
 }
 
