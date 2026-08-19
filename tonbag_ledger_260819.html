@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>톤백 관리대장</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* (기존 CSS 스타일 동일하므로 그대로 둡니다) */
+  :root{
+    --bg:#EEF1EF; --surface:#FFFFFF; --ink:#1F2A24; --muted:#5C6B63;
+    --accent-in:#D9480F; --full:#D9480F; --half:#E8A33D; --empty:#7E8A96;
+    --border:#D7DBD4; --danger:#B3261E;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--bg); color:var(--ink); font-family:'Inter',sans-serif; -webkit-font-smoothing:antialiased;}
+  .wrap{max-width:1020px; margin:0 auto; padding:28px 20px 60px;}
+  header{display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:22px; border-bottom:3px solid var(--ink); padding-bottom:14px;}
+  .eyebrow{font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:0.12em; color:var(--muted); text-transform:uppercase;}
+  h1{font-family:'Oswald',sans-serif; font-weight:700; font-size:30px; letter-spacing:0.01em; margin:2px 0 0;}
+  .subtitle{font-size:13px; color:var(--muted);}
+  .stats{display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-bottom:24px;}
+  .stat-card{background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:14px 12px 12px; display:flex; align-items:center; gap:10px;}
+  .stat-card .num{font-family:'Oswald',sans-serif; font-size:26px; font-weight:600; line-height:1;}
+  .stat-card .label{font-size:10.5px; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em; margin-top:3px;}
+  .stat-card.total .num{color:var(--ink);} .stat-card.full .num{color:var(--full);}
+  .stat-card.half .num{color:var(--half);} .stat-card.empty .num{color:var(--empty);}
+  .stat-card.calc .num{color:var(--ink);}
+  .panel{background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:18px; margin-bottom:24px;}
+  .panel-title{font-family:'Oswald',sans-serif; font-size:15px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; margin-bottom:14px;}
+  .form-grid{display:grid; grid-template-columns:1fr 1.6fr 1fr; gap:14px; align-items:end;}
+  .field label{display:block; font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px;}
+  .type-toggle{display:flex; gap:6px;}
+  .type-toggle button{flex:1; padding:10px 0; border-radius:6px; border:1.5px solid var(--border); background:#fff; font-weight:600; font-size:12.5px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px; white-space:nowrap;}
+  .type-toggle button.active[data-type="full"]{background:rgba(217,72,15,0.1); border-color:var(--full); color:var(--full);}
+  .type-toggle button.active[data-type="half"]{background:rgba(232,163,61,0.15); border-color:var(--half); color:#8a5c0f;}
+  .type-toggle button.active[data-type="empty"]{background:rgba(126,138,150,0.15); border-color:var(--empty); color:#4b545c;}
+  .qty-stepper{display:flex; align-items:center; border:1.5px solid var(--border); border-radius:6px; overflow:hidden;}
+  .qty-stepper button{width:38px; height:40px; border:none; background:var(--bg); font-size:18px; font-weight:600; cursor:pointer; color:var(--ink);}
+  .qty-stepper input{flex:1; border:none; text-align:center; font-family:'JetBrains Mono',monospace; font-size:16px; font-weight:600; padding:8px 4px; width:100%; min-width:0;}
+  .qty-stepper input:focus{outline:none;}
+  input[type="date"], input[type="text"]{width:100%; padding:10px 10px; border:1.5px solid var(--border); border-radius:6px; font-family:'Inter',sans-serif; font-size:14px; color:var(--ink); background:#fff;}
+  input[type="date"]:focus, input[type="text"]:focus{outline:none; border-color:var(--ink);}
+  .full-row{grid-column:1 / -1;}
+  .submit-btn{margin-top:16px; width:100%; padding:13px 0; border:none; border-radius:6px; font-family:'Oswald',sans-serif; font-weight:600; font-size:15px; letter-spacing:0.03em; color:#fff; cursor:pointer; background:var(--accent-in); transition:opacity .12s ease;}
+  .submit-btn:hover{opacity:0.9;} .submit-btn:active{opacity:0.8;}
+  .submit-btn:disabled{background:var(--muted); cursor:not-allowed;}
+  .hint{font-size:12px; color:var(--danger); margin-top:8px; min-height:16px;}
+  .log-header{display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;}
+  .clear-btn{padding:7px 14px; border-radius:20px; border:1.5px solid var(--danger); background:#fff; font-size:12px; font-weight:600; color:var(--danger); cursor:pointer; transition:all .12s ease;}
+  .clear-btn.confirming{background:var(--danger); color:#fff;}
+  .clear-btn:disabled{opacity: 0.5; cursor:not-allowed;}
+  table{width:100%; border-collapse:collapse; background:var(--surface); border:1px solid var(--border); border-radius:8px; overflow:hidden; font-size:13px;}
+  thead th{text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted); padding:10px 12px; background:var(--bg); border-bottom:1px solid var(--border);}
+  tbody td{padding:10px 12px; border-bottom:1px solid var(--border); font-family:'JetBrains Mono',monospace; font-size:12.5px; vertical-align:middle;}
+  tbody tr:last-child td{border-bottom:none;}
+  tbody tr:hover{background:#FAFAF8;}
+  .no{color:var(--muted);}
+  .bagchip{display:inline-flex; align-items:center; gap:5px; font-weight:600;}
+  .memo-cell{font-family:'Inter',sans-serif; color:var(--muted); max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .del-btn{background:none; border:none; color:var(--muted); cursor:pointer; font-size:16px; padding:2px 6px; border-radius:4px;}
+  .del-btn:hover{color:var(--danger); background:rgba(179,38,30,0.08);}
+  .empty-row td{text-align:center; color:var(--muted); font-family:'Inter',sans-serif; padding:30px 12px;}
+  .log-scroll{max-height:420px; overflow-y:auto; border-radius:8px;}
+  .log-scroll table{border-radius:0;}
+  .log-scroll thead th{position:sticky; top:0; z-index:1;}
+  @media (max-width:760px){.stats{grid-template-columns:repeat(3,1fr);}}
+  @media (max-width:640px){.stats{grid-template-columns:repeat(2,1fr); .form-grid{grid-template-columns:1fr;} .memo-cell{max-width:100px;}}}
+</style>
+</head>
+<body>
+<!-- HTML 구조는 동일하므로 중략 없이 전체를 제공합니다 -->
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow">Bulk Bag Inventory</div>
+      <h1>톤백 관리대장</h1>
+      <div class="subtitle">입고 기록 &amp; 현재 재고 현황</div>
+    </div>
+  </header>
+
+  <div class="stats">
+    <div class="stat-card total"><div><div class="num" id="statTotal">0</div><div class="label">총 재고 (개)</div></div></div>
+    <div class="stat-card full"><div><div class="num" id="statFull">0</div><div class="label">Full 재고</div></div></div>
+    <div class="stat-card half"><div><div class="num" id="statHalf">0</div><div class="label">Half 재고</div></div></div>
+    <div class="stat-card empty"><div><div class="num" id="statEmpty">0</div><div class="label">빈톤백 재고</div></div></div>
+    <div class="stat-card calc"><div><div class="num" id="statCalc">0</div><div class="label">환산 수량 (full=1)</div></div></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title">입고 등록</div>
+    <div class="form-grid">
+      <div class="field">
+        <label>날짜</label>
+        <input type="date" id="fDate">
+      </div>
+      <div class="field">
+        <label>구분 (내용물 상태)</label>
+        <div class="type-toggle">
+          <button data-type="full" class="active" onclick="setType('full')">● Full</button>
+          <button data-type="half" onclick="setType('half')">◐ Half</button>
+          <button data-type="empty" onclick="setType('empty')">○ 빈백</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>수량 (개)</label>
+        <div class="qty-stepper">
+          <button type="button" onclick="stepQty(-1)">−</button>
+          <input type="text" inputmode="numeric" id="fQty" value="1">
+          <button type="button" onclick="stepQty(1)">+</button>
+        </div>
+      </div>
+      <div class="field full-row">
+        <label>메모 (선택)</label>
+        <input type="text" id="fMemo" placeholder="예: 3공장 반입, A현장 등">
+      </div>
+    </div>
+    <div style="font-size:11.5px; color:var(--muted); margin-top:12px;">※ Full / Half로 등록하면 같은 수량만큼 빈톤백 재고에서 자동 차감됩니다.</div>
+    <button class="submit-btn" id="submitBtn" onclick="submitEntry()">입고 등록</button>
+    <div class="hint" id="formHint"></div>
+  </div>
+
+  <div class="panel">
+    <div class="log-header">
+      <div class="panel-title" style="margin-bottom:0;">입고 내역</div>
+      <button class="clear-btn" id="clearBtn" onclick="handleClearClick()">전체삭제</button>
+    </div>
+    <div class="log-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>No.</th><th>날짜</th><th>상태</th><th>수량</th><th>메모</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="logBody">
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+// ==========================================
+// 주의: 아래 SCRIPT_URL에 구글 앱스 스크립트 배포 URL을 꼭 넣으세요!
+// ==========================================
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwsFyIwWfIt0aprZi6lqTV-1J-A4NNxJY7okqL46-PO5FTD_xmbnUfZWqJUOpbDcUL9/exec';
+
+const TYPE_LABELS = { full: 'Full', half: 'Half', empty: '빈백' };
+const TYPE_RATIO = { full: 1, half: 0.5, empty: 0 };
+const TYPE_COLOR_VAR = { full: '--full', half: '--half', empty: '--empty' };
+
+let entries = [];
+let currentType = 'full';
+let clearConfirmTimer = null;
+
+function todayStr(){
+  const d = new Date();
+  return d.toISOString().slice(0,10);
+}
+
+// 구글 시트에서 데이터 불러오기
+async function loadEntries(){
+  const tbody = document.getElementById('logBody');
+  tbody.innerHTML = `<tr class="empty-row"><td colspan="6">데이터를 불러오는 중입니다...</td></tr>`;
+  
+  try{
+    const res = await fetch(SCRIPT_URL);
+    const data = await res.json();
+    entries = data;
+  }catch(e){
+    console.error("데이터 로드 실패:", e);
+    entries = [];
+  }
+  entries = entries.filter(e => e && TYPE_LABELS[e.type]);
+  render();
+}
+
+function setType(type){
+  currentType = type;
+  document.querySelectorAll('.type-toggle button').forEach(b=>{
+    b.classList.toggle('active', b.dataset.type === type);
+  });
+}
+
+function stepQty(delta){
+  const input = document.getElementById('fQty');
+  let val = parseInt(input.value, 10);
+  if(isNaN(val)) val = 0;
+  val = Math.max(1, val + delta);
+  input.value = val;
+}
+
+function getStock(){
+  let full = 0, half = 0, empty = 0;
+  entries.forEach(e=>{
+    if(e.type === 'full'){ full += e.qty; empty -= e.qty; }
+    else if(e.type === 'half'){ half += e.qty; empty -= e.qty; }
+    else if(e.type === 'empty'){ empty += e.qty; }
+  });
+  return { full, half, empty: Math.max(0, empty) };
+}
+
+// 구글 시트로 입고 데이터 전송하기
+async function submitEntry(){
+  const hint = document.getElementById('formHint');
+  hint.textContent = '';
+
+  const dateEl = document.getElementById('fDate');
+  const qtyEl = document.getElementById('fQty');
+  const memoEl = document.getElementById('fMemo');
+
+  const date = dateEl.value || todayStr();
+  const qty = parseInt(qtyEl.value, 10);
+  const memo = memoEl.value.trim();
+
+  if(!qty || qty <= 0){
+    hint.textContent = '수량을 1개 이상 입력해주세요.';
+    return;
+  }
+
+  if(currentType === 'full' || currentType === 'half'){
+    const stock = getStock();
+    if(qty > stock.empty){
+      hint.textContent = `빈톤백 재고 부족: 현재 빈톤백 재고는 ${stock.empty}개입니다. 빈톤백을 먼저 입고하거나 수량을 줄여주세요.`;
+      return;
+    }
+  }
+
+  const entry = {
+    id: Date.now() + '-' + Math.random().toString(36).slice(2,7),
+    date,
+    type: currentType,
+    qty,
+    memo,
+    createdAt: Date.now()
+  };
+
+  // UI 버튼 상태 변경 (중복 클릭 방지)
+  const submitBtn = document.getElementById('submitBtn');
+  submitBtn.disabled = true;
+  submitBtn.textContent = '저장 중...';
+
+  try {
+    await fetch(SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'insert', data: entry })
+    });
+    
+    entries.push(entry);
+    qtyEl.value = 1;
+    memoEl.value = '';
+    render();
+  } catch(e) {
+    hint.textContent = '구글 시트 저장에 실패했습니다.';
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = '입고 등록';
+  }
+}
+
+// 구글 시트에서 개별 삭제
+async function deleteEntry(id){
+  // 낙관적 UI 업데이트 (화면에서 먼저 삭제)
+  entries = entries.filter(e => e.id !== id);
+  render();
+
+  try {
+    await fetch(SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'delete', id: id })
+    });
+  } catch(e) {
+    alert("삭제 중 오류가 발생했습니다. 새로고침 해주세요.");
+  }
+}
+
+function handleClearClick(){
+  const btn = document.getElementById('clearBtn');
+  if(btn.classList.contains('confirming')){
+    clearTimeout(clearConfirmTimer);
+    btn.classList.remove('confirming');
+    btn.textContent = '전체삭제';
+    clearAllEntries();
+  }else{
+    btn.classList.add('confirming');
+    btn.textContent = '정말 삭제할까요? (다시 클릭)';
+    clearConfirmTimer = setTimeout(()=>{
+      btn.classList.remove('confirming');
+      btn.textContent = '전체삭제';
+    }, 3000);
+  }
+}
+
+// 구글 시트 데이터 전체 삭제
+async function clearAllEntries(){
+  const btn = document.getElementById('clearBtn');
+  btn.disabled = true;
+  btn.textContent = '삭제 중...';
+
+  try {
+    await fetch(SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'clear' })
+    });
+    entries = [];
+    render();
+  } catch(e) {
+    alert("전체 삭제 중 오류가 발생했습니다.");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '전체삭제';
+  }
+}
+
+function bagIcon(type, uid){
+  const colorVar = `var(${TYPE_COLOR_VAR[type]})`;
+  const ratio = TYPE_RATIO[type];
+  const top = 4, bottom = 18, totalH = bottom - top;
+  const filledH = totalH * ratio;
+  const rectY = bottom - filledH;
+  const clipId = 'clip-' + uid;
+  return `<svg width="16" height="16" viewBox="0 0 20 20" style="flex-shrink:0;">
+    <defs><clipPath id="${clipId}"><path d="M5 4 L15 4 L17 18 L3 18 Z"/></clipPath></defs>
+    <path d="M5 4 L15 4 L17 18 L3 18 Z" fill="none" stroke="${colorVar}" stroke-width="1.6" stroke-linejoin="round"/>
+    <rect x="3" y="${rectY}" width="14" height="${filledH}" fill="${colorVar}" opacity="0.85" clip-path="url(#${clipId})"/>
+  </svg>`;
+}
+
+function renderStats(){
+  const stock = getStock();
+  document.getElementById('statTotal').textContent = stock.full + stock.half + stock.empty;
+  document.getElementById('statFull').textContent = stock.full;
+  document.getElementById('statHalf').textContent = stock.half;
+  document.getElementById('statEmpty').textContent = stock.empty;
+  document.getElementById('statCalc').textContent = (stock.full + stock.half * 0.5).toFixed(1);
+}
+
+function renderLog(){
+  const tbody = document.getElementById('logBody');
+  if(entries.length === 0){
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="6">기록이 없습니다. 위에서 입고를 등록해보세요.</td></tr>`;
+    return;
+  }
+  const chronological = entries.slice().sort((a,b)=> a.createdAt - b.createdAt);
+  const noMap = {};
+  chronological.forEach((e, idx)=>{ noMap[e.id] = idx + 1; });
+  const list = entries.slice().sort((a,b)=> b.createdAt - a.createdAt);
+
+  tbody.innerHTML = list.map(e=>{
+    const noStr = String(noMap[e.id]).padStart(4,'0');
+    const typeLabel = TYPE_LABELS[e.type] || e.type;
+    return `<tr>
+      <td class="no">#${noStr}</td>
+      <td>${e.date}</td>
+      <td><span class="bagchip">${bagIcon(e.type, e.id)} ${typeLabel}</span></td>
+      <td>${e.qty}개</td>
+      <td class="memo-cell">${e.memo ? e.memo : '—'}</td>
+      <td><button class="del-btn" onclick="deleteEntry('${e.id}')" title="삭제">✕</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function render(){
+  renderStats();
+  renderLog();
+}
+
+document.getElementById('fDate').value = todayStr();
+loadEntries();
+</script>
+</body>
+</html>
