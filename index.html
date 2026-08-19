@@ -558,8 +558,8 @@ function todayStr(){
 
 async function loadEntries(){
   try{
-    const res = await window.storage.get(STORAGE_KEY, false);
-    entries = res && res.value ? JSON.parse(res.value) : [];
+    const raw = localStorage.getItem(STORAGE_KEY);
+    entries = raw ? JSON.parse(raw) : [];
   }catch(e){
     entries = [];
   }
@@ -570,12 +570,9 @@ async function loadEntries(){
 
 async function saveEntries(){
   try{
-    const res = await window.storage.set(STORAGE_KEY, JSON.stringify(entries), false);
-    if(!res){
-      document.getElementById('formHint').textContent = '저장에 실패했습니다. 다시 시도해주세요.';
-    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
   }catch(e){
-    document.getElementById('formHint').textContent = '저장 중 오류가 발생했습니다.';
+    document.getElementById('formHint').textContent = '저장 중 오류가 발생했습니다. (브라우저 저장공간이 가득 찼거나 시크릿 모드일 수 있어요)';
   }
 }
 
