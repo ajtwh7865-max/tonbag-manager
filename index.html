@@ -6,6 +6,8 @@
 <title>톤백 관리대장</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
 <style>
   :root{
     --bg:#EEF1EF;
@@ -18,6 +20,7 @@
     --empty:#7E8A96;
     --border:#D7DBD4;
     --danger:#B3261E;
+    --ok:#2F7D4F;
   }
   *{box-sizing:border-box;}
   body{
@@ -60,6 +63,20 @@
     font-size:13px;
     color:var(--muted);
   }
+  .sync-badge{
+    display:inline-block;
+    margin-top:8px;
+    font-size:11px;
+    font-weight:600;
+    padding:4px 10px;
+    border-radius:20px;
+    border:1px solid var(--border);
+    color:var(--muted);
+    font-family:'JetBrains Mono',monospace;
+    background:#fff;
+  }
+  .sync-badge.connected{border-color:var(--ok); color:var(--ok); background:rgba(47,125,79,0.08);}
+  .sync-badge.local{border-color:var(--danger); color:var(--danger); background:rgba(179,38,30,0.06);}
 
   /* ---- Stats ---- */
   .stats{
@@ -404,6 +421,7 @@
       <div class="eyebrow">Bulk Bag Inventory</div>
       <h1>톤백 관리대장</h1>
       <div class="subtitle">입고 기록 &amp; 현재 재고 현황</div>
+      <div class="sync-badge" id="syncBadge">🔄 연결 확인 중…</div>
     </div>
   </header>
 
@@ -542,7 +560,7 @@
 </div>
 
 <script>
-const STORAGE_KEY = 'tonbag_entries';
+const STORAGE_KEY = 'tonbag_entries'; // Firebase 연결 실패시에만 쓰는 로컬(이 브라우저 전용) 백업 키
 const TYPE_LABELS = { full: 'Full', half: 'Half', empty: '빈백' };
 const TYPE_RATIO = { full: 1, half: 0.5, empty: 0 };
 const TYPE_COLOR_VAR = { full: '--full', half: '--half', empty: '--empty' };
@@ -551,24 +569,126 @@ let entries = [];
 let currentType = 'full';
 let clearConfirmTimer = null;
 
+/* ============================================================
+   FIREBASE (공유 클라우드 저장소)
+   - 기기가동 기록서(eqlog-app)와 같은 Firebase 프로젝트를 재사용합니다.
+     그 프로젝트의 Firestore 보안규칙이 이미 "모든 문서 읽기/쓰기 허용"으로
+     열려 있어서, 여기서는 새 컬렉션("tonbag")만 쓰면 되고 Firebase
+     콘솔에서 따로 설정할 게 없습니다.
+   - 연결에 실패하면 이 브라우저의 localStorage에만 저장되며(예전 방식과
+     동일), 다른 사람/기기와 공유되지 않습니다. 화면 상단 배지로 현재
+     상태(공유됨 / 단독 실행)를 항상 보여줍니다.
+   - 여러 사람이 동시에 쓰는 경우를 대비해 onSnapshot 실시간 구독을 사용:
+     누군가 입고를 등록하면 다른 사람 화면에도 새로고침 없이 바로 반영됩니다.
+     (단, 아주 짧은 순간 두 명이 동시에 저장하면 나중 저장이 앞선 저장을
+     덮어쓸 수 있습니다 — 소규모 사내 사용 기준으로는 문제되지 않는 수준)
+============================================================ */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBtf8lX15eLMRVKthHEzjl4pJKJTq5gVvk",
+  authDomain: "equipment-operation-log.firebaseapp.com",
+  projectId: "equipment-operation-log",
+  storageBucket: "equipment-operation-log.firebasestorage.app",
+  messagingSenderId: "695600318374",
+  appId: "1:695600318374:web:795fcf2a3f0179570cf167"
+};
+let firebaseDb = null;
+let useFirebase = false;
+let unsubscribeEntries = null;
+
+function tonbagDocRef(){
+  return firebaseDb.collection('tonbag').doc('entries');
+}
+function isFirebaseConfigured(){
+  return !!(FIREBASE_CONFIG && FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.projectId);
+}
+function withTimeout(promise, ms){
+  return Promise.race([
+    promise,
+    new Promise((_, reject)=> setTimeout(()=>reject(new Error('timeout')), ms))
+  ]);
+}
+async function initFirebaseBackend(){
+  if(!isFirebaseConfigured()) return false;
+  if(typeof firebase === 'undefined' || !firebase.initializeApp) return false;
+  for(let attempt=1; attempt<=2; attempt++){
+    try{
+      if(!firebase.apps || !firebase.apps.length){
+        firebase.initializeApp(FIREBASE_CONFIG);
+      }
+      firebaseDb = firebase.firestore();
+      // 연결 확인용 ping. Firestore는 앞뒤로 밑줄 두 개씩인 이름("__xxx__")을
+      // 예약어로 취급해 거부하므로, 끝을 밑줄 한 개로 맞춘 안전한 이름을 쓴다.
+      await withTimeout(firebaseDb.collection('tonbag').doc('__ping_check_').get(), 5000);
+      return true;
+    }catch(e){
+      console.error(`[톤백 관리대장] Firebase 연결 시도 ${attempt}번째 실패`, e);
+      firebaseDb = null;
+      if(attempt === 2) return false;
+    }
+  }
+  return false;
+}
+function updateSyncBadge(){
+  const badge = document.getElementById('syncBadge');
+  if(!badge) return;
+  if(useFirebase){
+    badge.textContent = '☁ 공유 저장소 연결됨 — 모든 기기/사용자에게 공유됩니다';
+    badge.className = 'sync-badge connected';
+  } else {
+    badge.textContent = '⚠ 단독 실행 — 이 브라우저에만 저장되어 공유되지 않습니다';
+    badge.className = 'sync-badge local';
+  }
+}
+
 function todayStr(){
   const d = new Date();
   return d.toISOString().slice(0,10);
 }
 
+function sanitizeEntries(list){
+  return (Array.isArray(list) ? list : []).filter(e => e && TYPE_LABELS[e.type]);
+}
+
 async function loadEntries(){
+  // Firebase 모드에서는 subscribeEntries()의 실시간 구독이 entries를 채우고
+  // render()도 그쪽에서 호출하므로, 이 함수는 로컬(localStorage) 모드에서만 쓰인다.
   try{
     const raw = localStorage.getItem(STORAGE_KEY);
-    entries = raw ? JSON.parse(raw) : [];
+    entries = sanitizeEntries(raw ? JSON.parse(raw) : []);
   }catch(e){
     entries = [];
   }
-  // guard against any legacy/unexpected type values
-  entries = entries.filter(e => e && TYPE_LABELS[e.type]);
   render();
 }
 
+function subscribeEntries(){
+  if(unsubscribeEntries) unsubscribeEntries();
+  unsubscribeEntries = tonbagDocRef().onSnapshot(
+    snap => {
+      const data = snap.exists ? snap.data() : null;
+      entries = sanitizeEntries(data && data.entries);
+      render();
+    },
+    err => {
+      console.error('[톤백 관리대장] 실시간 동기화 오류', err);
+      document.getElementById('formHint').textContent = '공유 저장소와 연결이 끊겼습니다. 새로고침해주세요.';
+    }
+  );
+}
+
 async function saveEntries(){
+  if(useFirebase && firebaseDb){
+    try{
+      await tonbagDocRef().set({ entries, updatedAt: Date.now() });
+      // 화면 갱신은 subscribeEntries()의 onSnapshot이 처리한다
+      // (다른 사람이 등록한 내용도 똑같은 방식으로 실시간 반영됨)
+      return;
+    }catch(e){
+      console.error('[톤백 관리대장] 공유 저장소 저장 실패', e);
+      document.getElementById('formHint').textContent = '공유 저장소 저장에 실패했습니다. 인터넷 연결을 확인해주세요.';
+      return;
+    }
+  }
   try{
     localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
   }catch(e){
@@ -779,7 +899,15 @@ function render(){
 }
 
 document.getElementById('fDate').value = todayStr();
-loadEntries();
+(async function bootstrap(){
+  useFirebase = await initFirebaseBackend();
+  updateSyncBadge();
+  if(useFirebase){
+    subscribeEntries();
+  } else {
+    await loadEntries();
+  }
+})();
 </script>
 </body>
 </html>
