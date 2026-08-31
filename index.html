@@ -81,7 +81,7 @@
   /* ---- Stats ---- */
   .stats{
     display:grid;
-    grid-template-columns:repeat(5,1fr);
+    grid-template-columns:repeat(4,1fr);
     gap:12px;
     margin-bottom:24px;
   }
@@ -111,7 +111,6 @@
   .stat-card.full .num{color:var(--full);}
   .stat-card.half .num{color:var(--half);}
   .stat-card.empty .num{color:var(--empty);}
-  .stat-card.calc .num{color:var(--ink);}
 
   /* ---- Panel ---- */
   .panel{
@@ -389,6 +388,54 @@
     border-radius:4px;
   }
   .del-btn:hover{color:var(--danger); background:rgba(179,38,30,0.08);}
+  .edit-btn{
+    background:none;
+    border:none;
+    color:var(--muted);
+    cursor:pointer;
+    font-size:15px;
+    padding:2px 6px;
+    border-radius:4px;
+  }
+  .edit-btn:hover{color:var(--accent-in); background:rgba(217,72,15,0.08);}
+  .status-select{
+    font-family:'Inter',sans-serif;
+    font-weight:700;
+    font-size:12.5px;
+    padding:5px 8px;
+    border-radius:6px;
+    border:1.5px solid var(--border);
+    background:#fff;
+    color:var(--ink);
+    cursor:pointer;
+  }
+  .status-select:focus{outline:none;}
+  .status-select.type-full{border-color:var(--full); color:var(--full);}
+  .status-select.type-half{border-color:var(--half); color:#8a5c0f;}
+  tr.editing-row{background:rgba(217,72,15,0.06);}
+  .cancel-edit-btn{
+    margin-top:8px;
+    width:100%;
+    padding:10px 0;
+    border:1.5px solid var(--border);
+    border-radius:6px;
+    font-family:'Oswald',sans-serif;
+    font-weight:600;
+    font-size:13px;
+    letter-spacing:0.03em;
+    color:var(--muted);
+    background:#fff;
+    cursor:pointer;
+  }
+  .cancel-edit-btn:hover{background:var(--bg);}
+  .edit-mode-note{
+    font-size:12px;
+    color:var(--accent-in);
+    font-weight:600;
+    margin-bottom:10px;
+    display:none;
+  }
+  .edit-mode-note.show{display:block;}
   .empty-row td{
     text-align:center;
     color:var(--muted);
@@ -441,7 +488,7 @@
     <div class="stat-card half">
       <div>
         <div class="num" id="statHalf">0</div>
-        <div class="label">Half 재고</div>
+        <div class="label">사용 잔량</div>
       </div>
     </div>
     <div class="stat-card empty">
@@ -450,16 +497,11 @@
         <div class="label">빈톤백 재고</div>
       </div>
     </div>
-    <div class="stat-card calc">
-      <div>
-        <div class="num" id="statCalc">0</div>
-        <div class="label">환산 수량 (full=1)</div>
-      </div>
-    </div>
   </div>
 
   <div class="panel">
-    <div class="panel-title">입고 등록</div>
+    <div class="panel-title" id="formPanelTitle">입고 등록</div>
+    <div class="edit-mode-note" id="editModeNote">✎ 이 항목을 수정하는 중입니다. 내용을 고친 뒤 "수정 완료"를 누르세요.</div>
 
     <div class="form-grid">
       <div class="field">
@@ -470,7 +512,7 @@
         <label>구분 (내용물 상태)</label>
         <div class="type-toggle">
           <button data-type="full" class="active" onclick="setType('full')">● Full</button>
-          <button data-type="half" onclick="setType('half')">◐ Half</button>
+          <button data-type="half" onclick="setType('half')">◐ 사용</button>
           <button data-type="empty" onclick="setType('empty')">○ 빈백</button>
         </div>
       </div>
@@ -488,8 +530,9 @@
       </div>
     </div>
 
-    <div style="font-size:11.5px; color:var(--muted); margin-top:12px;">※ Full / Half로 등록하면 같은 수량만큼 빈톤백 재고에서 자동 차감됩니다.</div>
+    <div style="font-size:11.5px; color:var(--muted); margin-top:12px;">※ Full / 사용으로 등록하면 같은 수량만큼 빈톤백 재고에서 자동 차감됩니다.</div>
     <button class="submit-btn" id="submitBtn" onclick="submitEntry()">입고 등록</button>
+    <button class="cancel-edit-btn" id="cancelEditBtn" style="display:none;" onclick="cancelEdit()">수정 취소</button>
     <div class="hint" id="formHint"></div>
   </div>
 
@@ -506,7 +549,7 @@
       </div>
       <div class="count-card half">
         <div class="cnum" id="cntHalf">0</div>
-        <div class="clabel">Half 건수</div>
+        <div class="clabel">사용 건수</div>
       </div>
       <div class="count-card empty">
         <div class="cnum" id="cntEmpty">0</div>
@@ -524,7 +567,7 @@
             <th>메모</th>
             <th style="text-align:right;">건수</th>
             <th style="text-align:right;">Full</th>
-            <th style="text-align:right;">Half</th>
+            <th style="text-align:right;">사용</th>
             <th style="text-align:right;">빈백</th>
             <th style="text-align:right;">합계 (개)</th>
           </tr>
@@ -561,13 +604,14 @@
 
 <script>
 const STORAGE_KEY = 'tonbag_entries'; // Firebase 연결 실패시에만 쓰는 로컬(이 브라우저 전용) 백업 키
-const TYPE_LABELS = { full: 'Full', half: 'Half', empty: '빈백' };
+const TYPE_LABELS = { full: 'Full', half: '사용', empty: '빈백' };
 const TYPE_RATIO = { full: 1, half: 0.5, empty: 0 };
 const TYPE_COLOR_VAR = { full: '--full', half: '--half', empty: '--empty' };
 
 let entries = [];
 let currentType = 'full';
 let clearConfirmTimer = null;
+let editingId = null; // 현재 "입고내역"에서 수정 중인 항목의 id (null이면 신규 등록 모드)
 
 /* ============================================================
    FIREBASE (공유 클라우드 저장소)
@@ -711,16 +755,53 @@ function stepQty(delta){
   input.value = val;
 }
 
-function getStock(){
+function getStock(excludeId){
   // 빈톤백 입고는 빈톤백 재고를 늘리고, Full/Half 입고는 빈톤백을 채워서 쓰는 것이므로
-  // 빈톤백 재고에서 그만큼 차감한다.
+  // 빈톤백 재고에서 "항상 1개 단위로" 그만큼 차감한다 (Half라고 해서 0.5개만 차감하지 않음).
+  // excludeId를 넘기면 그 항목은 계산에서 제외한다 — 기존 항목을 수정할 때, 그 항목이
+  // 이미 반영해둔 차감분을 빼고 "이 항목이 없었다면"의 재고를 기준으로 다시 검사하기 위함.
   let full = 0, half = 0, empty = 0;
   entries.forEach(e=>{
+    if(excludeId && e.id === excludeId) return;
     if(e.type === 'full'){ full += e.qty; empty -= e.qty; }
     else if(e.type === 'half'){ half += e.qty; empty -= e.qty; }
     else if(e.type === 'empty'){ empty += e.qty; }
   });
   return { full, half, empty: Math.max(0, empty) };
+}
+
+function startEditEntry(id){
+  const target = entries.find(e => e.id === id);
+  if(!target) return;
+  editingId = id;
+  document.getElementById('fDate').value = target.date;
+  document.getElementById('fQty').value = target.qty;
+  document.getElementById('fMemo').value = target.memo || '';
+  setType(target.type);
+  document.getElementById('formPanelTitle').textContent = '입고 내역 수정';
+  document.getElementById('editModeNote').classList.add('show');
+  document.getElementById('submitBtn').textContent = '수정 완료';
+  document.getElementById('cancelEditBtn').style.display = 'block';
+  document.getElementById('formHint').textContent = '';
+  document.querySelector('.panel').scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+function exitEditMode(){
+  editingId = null;
+  document.getElementById('formPanelTitle').textContent = '입고 등록';
+  document.getElementById('editModeNote').classList.remove('show');
+  document.getElementById('submitBtn').textContent = '입고 등록';
+  document.getElementById('cancelEditBtn').style.display = 'none';
+}
+
+function cancelEdit(){
+  exitEditMode();
+  document.getElementById('fDate').value = todayStr();
+  document.getElementById('fQty').value = 1;
+  document.getElementById('fMemo').value = '';
+  setType('full');
+  document.getElementById('formHint').textContent = '';
+  render();
 }
 
 async function submitEntry(){
@@ -741,30 +822,62 @@ async function submitEntry(){
   }
 
   if(currentType === 'full' || currentType === 'half'){
-    const stock = getStock();
+    // 수정 모드일 때는 "수정 중인 이 항목 자체"는 재고 계산에서 빼고 검사한다
+    // (그렇지 않으면 이미 자기 자신이 차감해둔 만큼 때문에 재고가 부족하다고 잘못 판단됨)
+    const stock = getStock(editingId);
     if(qty > stock.empty){
       hint.textContent = `빈톤백 재고 부족: 현재 빈톤백 재고는 ${stock.empty}개입니다. 빈톤백을 먼저 입고하거나 수량을 줄여주세요.`;
       return;
     }
   }
 
-  const entry = {
-    id: Date.now() + '-' + Math.random().toString(36).slice(2,7),
-    date,
-    type: currentType,
-    qty,
-    memo,
-    createdAt: Date.now()
-  };
-  entries.push(entry);
-  await saveEntries();
+  if(editingId){
+    const idx = entries.findIndex(e => e.id === editingId);
+    if(idx === -1){
+      hint.textContent = '수정할 항목을 찾지 못했습니다. 목록이 바뀌었을 수 있어요 — 다시 시도해주세요.';
+      exitEditMode();
+      return;
+    }
+    entries[idx] = { ...entries[idx], date, type: currentType, qty, memo };
+    await saveEntries();
+    exitEditMode();
+  } else {
+    const entry = {
+      id: Date.now() + '-' + Math.random().toString(36).slice(2,7),
+      date,
+      type: currentType,
+      qty,
+      memo,
+      createdAt: Date.now()
+    };
+    entries.push(entry);
+    await saveEntries();
+  }
 
   qtyEl.value = 1;
   memoEl.value = '';
   render();
 }
 
+async function changeEntryType(selectEl){
+  // 입고내역 표에서 드롭다운으로 Full <-> 사용을 바로 전환한다.
+  // 두 상태 모두 빈톤백을 수량만큼 1:1로 차감하는 건 동일하므로, 재고 부족 검사 없이
+  // 안전하게 종류만 바꿔 저장한다.
+  const id = selectEl.dataset.id;
+  const newType = selectEl.value;
+  const entry = entries.find(e => e.id === id);
+  if(!entry || entry.type === newType) return;
+  entry.type = newType;
+  if(editingId === id){
+    // 수정 폼이 이 항목을 열어둔 상태라면 폼의 종류 선택도 같이 맞춰준다
+    setType(newType);
+  }
+  await saveEntries();
+  render();
+}
+
 async function deleteEntry(id){
+  if(editingId === id) cancelEdit();
   entries = entries.filter(e => e.id !== id);
   await saveEntries();
   render();
@@ -788,6 +901,7 @@ function handleClearClick(){
 }
 
 async function clearAllEntries(){
+  if(editingId) cancelEdit();
   entries = [];
   await saveEntries();
   render();
@@ -817,7 +931,6 @@ function renderStats(){
   document.getElementById('statFull').textContent = stock.full;
   document.getElementById('statHalf').textContent = stock.half;
   document.getElementById('statEmpty').textContent = stock.empty;
-  document.getElementById('statCalc').textContent = (stock.full + stock.half * 0.5).toFixed(1);
 }
 
 function renderLog(){
@@ -838,13 +951,26 @@ function renderLog(){
   tbody.innerHTML = list.map(e=>{
     const noStr = String(noMap[e.id]).padStart(4,'0');
     const typeLabel = TYPE_LABELS[e.type] || e.type;
-    return `<tr>
+    const rowClass = e.id === editingId ? ' class="editing-row"' : '';
+    // Full/사용(half)은 표에서 바로 드롭다운으로 상태를 바꿀 수 있다 (수량은 그대로
+    // 유지되고, Full<->사용 전환은 빈톤백 차감량이 동일해서 재고 검사가 필요 없다).
+    // 빈백은 별도 항목(빈 자루 입고 자체)이라 이 드롭다운 대상에서 제외한다.
+    const statusCell = (e.type === 'full' || e.type === 'half')
+      ? `<select class="status-select type-${e.type}" data-id="${e.id}" onchange="changeEntryType(this)">
+          <option value="full" ${e.type==='full' ? 'selected' : ''}>● Full</option>
+          <option value="half" ${e.type==='half' ? 'selected' : ''}>◐ 사용</option>
+        </select>`
+      : `<span class="bagchip">${bagIcon(e.type, e.id)} ${typeLabel}</span>`;
+    return `<tr${rowClass}>
       <td class="no">#${noStr}</td>
       <td>${e.date}</td>
-      <td><span class="bagchip">${bagIcon(e.type, e.id)} ${typeLabel}</span></td>
+      <td>${statusCell}</td>
       <td>${e.qty}개</td>
       <td class="memo-cell">${e.memo ? e.memo : '—'}</td>
-      <td><button class="del-btn" onclick="deleteEntry('${e.id}')" title="삭제">✕</button></td>
+      <td>
+        <button class="edit-btn" onclick="startEditEntry('${e.id}')" title="수정">✎</button>
+        <button class="del-btn" onclick="deleteEntry('${e.id}')" title="삭제">✕</button>
+      </td>
     </tr>`;
   }).join('');
 }
