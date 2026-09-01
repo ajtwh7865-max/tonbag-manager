@@ -251,39 +251,6 @@
     min-height:16px;
   }
 
-  /* ---- Count breakdown ---- */
-  .count-grid{
-    display:grid;
-    grid-template-columns:repeat(4,1fr);
-    gap:12px;
-  }
-  .count-card{
-    background:var(--bg);
-    border:1px solid var(--border);
-    border-radius:6px;
-    padding:12px;
-    text-align:center;
-  }
-  .count-card .cnum{
-    font-family:'Oswald',sans-serif;
-    font-size:22px;
-    font-weight:600;
-    line-height:1;
-  }
-  .count-card .clabel{
-    font-size:10.5px;
-    color:var(--muted);
-    text-transform:uppercase;
-    letter-spacing:0.04em;
-    margin-top:4px;
-  }
-  .count-card.full .cnum{color:var(--full);}
-  .count-card.half .cnum{color:var(--half);}
-  .count-card.empty .cnum{color:var(--empty);}
-  @media (max-width:640px){
-    .count-grid{grid-template-columns:repeat(2,1fr);}
-  }
-
   /* ---- Memo stats ---- */
   .memo-stats-table{
     width:100%;
@@ -324,6 +291,26 @@
     flex-wrap:wrap;
     gap:8px;
   }
+  .save-btn{
+    padding:7px 14px;
+    border-radius:20px;
+    border:1.5px solid var(--ok);
+    background:#fff;
+    font-size:12px;
+    font-weight:600;
+    color:var(--ok);
+    cursor:pointer;
+    transition:all .12s ease;
+  }
+  .save-btn.dirty{
+    border-color:var(--half);
+    background:rgba(232,163,61,0.15);
+    color:#8a5c0f;
+  }
+  .save-btn.done{
+    background:var(--ok);
+    color:#fff;
+  }
   .clear-btn{
     padding:7px 14px;
     border-radius:20px;
@@ -334,10 +321,6 @@
     color:var(--danger);
     cursor:pointer;
     transition:all .12s ease;
-  }
-  .clear-btn.confirming{
-    background:var(--danger);
-    color:#fff;
   }
   table{
     width:100%;
@@ -570,28 +553,6 @@
   </div>
 
   <div class="panel">
-    <div class="panel-title">등록 건수 (구분별)</div>
-    <div class="count-grid">
-      <div class="count-card total">
-        <div class="cnum" id="cntTotal">0</div>
-        <div class="clabel">총 등록 건수</div>
-      </div>
-      <div class="count-card full">
-        <div class="cnum" id="cntFull">0</div>
-        <div class="clabel">Full 건수</div>
-      </div>
-      <div class="count-card half">
-        <div class="cnum" id="cntHalf">0</div>
-        <div class="clabel">사용 건수</div>
-      </div>
-      <div class="count-card empty">
-        <div class="cnum" id="cntEmpty">0</div>
-        <div class="clabel">빈백 건수</div>
-      </div>
-    </div>
-  </div>
-
-  <div class="panel">
     <div class="panel-title">메모별 통계</div>
     <div class="log-scroll" style="max-height:none;">
       <table class="memo-stats-table" id="memoStatsTable">
@@ -613,7 +574,10 @@
   <div class="panel">
     <div class="log-header">
       <div class="panel-title" style="margin-bottom:0;">입고 내역</div>
-      <button class="clear-btn" id="clearBtn" onclick="handleClearClick()">전체삭제</button>
+      <div style="display:flex; gap:8px;">
+        <button class="save-btn" id="saveBtn" onclick="handleSaveClick()">💾 저장</button>
+        <button class="clear-btn" id="clearBtn" onclick="handleClearClick()">전체삭제</button>
+      </div>
     </div>
     <div class="log-scroll">
       <table>
@@ -644,8 +608,8 @@ const TYPE_COLOR_VAR = { full: '--full', half: '--half', empty: '--empty' };
 
 let entries = [];
 let currentType = 'full';
-let clearConfirmTimer = null;
 let editingId = null; // 현재 "입고내역"에서 수정 중인 항목의 id (null이면 신규 등록 모드)
+let isDirty = false; // "저장" 버튼을 누르기 전까지의, 아직 저장되지 않은 변경사항이 있는지 여부
 
 /* ============================================================
    FIREBASE (공유 클라우드 저장소)
@@ -743,6 +707,13 @@ function subscribeEntries(){
   if(unsubscribeEntries) unsubscribeEntries();
   unsubscribeEntries = tonbagDocRef().onSnapshot(
     snap => {
+      if(isDirty){
+        // "저장" 버튼을 누르기 전까지 저장되지 않은 내 변경사항이 있는 동안에는,
+        // 다른 사람이 그 사이에 저장한 내용으로 화면을 덮어써서 내 변경사항이
+        // 사라지지 않도록 잠시 반영을 미룬다. 저장 버튼을 누르면(그 순간 isDirty가
+        // false가 됨) 그 다음 스냅샷부터 다시 정상적으로 반영된다.
+        return;
+      }
       const data = snap.exists ? snap.data() : null;
       entries = sanitizeEntries(data && data.entries);
       render();
@@ -773,6 +744,35 @@ async function saveEntries(){
     document.getElementById('formHint').textContent = '저장 중 오류가 발생했습니다. (브라우저 저장공간이 가득 찼거나 시크릿 모드일 수 있어요)';
   }
 }
+
+// "저장" 버튼을 눌러야만 실제로 저장되도록 바뀌면서, 등록/수정/삭제는 화면(메모리)에서만
+// 바뀌고 바로 저장되지 않는다. 저장 전 상태를 버튼 색/문구로 계속 보여준다.
+let saveClickTimer = null;
+function updateSaveButtonUI(){
+  const btn = document.getElementById('saveBtn');
+  if(!btn) return;
+  clearTimeout(saveClickTimer);
+  btn.classList.remove('done');
+  if(isDirty){
+    btn.classList.add('dirty');
+    btn.textContent = '💾 저장 필요';
+  } else {
+    btn.classList.remove('dirty');
+    btn.textContent = '💾 저장';
+  }
+}
+
+function markDirty(){
+  isDirty = true;
+  updateSaveButtonUI();
+}
+
+window.addEventListener('beforeunload', (e)=>{
+  if(isDirty){
+    e.preventDefault();
+    e.returnValue = '';
+  }
+});
 
 const CAPACITY_OPTIONS = [100,200,300,400,500,600,700,800,900];
 
@@ -903,7 +903,7 @@ async function submitEntry(){
       return;
     }
     entries[idx] = { ...entries[idx], date, type: currentType, qty, memo, capacity };
-    await saveEntries();
+    markDirty();
     exitEditMode();
   } else {
     const entry = {
@@ -916,7 +916,7 @@ async function submitEntry(){
       createdAt: Date.now()
     };
     entries.push(entry);
-    await saveEntries();
+    markDirty();
   }
 
   qtyEl.value = 1;
@@ -945,7 +945,7 @@ async function changeEntryType(selectEl){
       document.getElementById('fCapacity').value = entry.capacity != null ? String(entry.capacity) : '';
     }
   }
-  await saveEntries();
+  markDirty();
   render();
 }
 
@@ -958,38 +958,60 @@ async function changeEntryCapacity(selectEl){
   if(editingId === id){
     document.getElementById('fCapacity').value = selectEl.value;
   }
-  await saveEntries();
+  markDirty();
   render();
 }
 
 async function deleteEntry(id){
   if(editingId === id) cancelEdit();
   entries = entries.filter(e => e.id !== id);
-  await saveEntries();
+  markDirty();
   render();
 }
 
-function handleClearClick(){
-  const btn = document.getElementById('clearBtn');
-  if(btn.classList.contains('confirming')){
-    clearTimeout(clearConfirmTimer);
-    btn.classList.remove('confirming');
-    btn.textContent = '전체삭제';
-    clearAllEntries();
-  }else{
-    btn.classList.add('confirming');
-    btn.textContent = '정말 삭제할까요? (다시 클릭)';
-    clearConfirmTimer = setTimeout(()=>{
-      btn.classList.remove('confirming');
-      btn.textContent = '전체삭제';
-    }, 3000);
+// 등록/수정/삭제/전체삭제는 전부 화면(메모리)에만 반영되고, 이 "저장" 버튼을 눌러야만
+// 실제로 공유 저장소(또는 이 브라우저)에 저장된다. 새로고침하거나 저장 없이 창을 닫으면
+// 저장 버튼을 누르기 전 변경사항은 사라진다(그래서 beforeunload 경고도 함께 걸어둔다).
+async function handleSaveClick(){
+  const btn = document.getElementById('saveBtn');
+  const hint = document.getElementById('formHint');
+  if(hint) hint.textContent = '';
+  btn.disabled = true;
+  await saveEntries();
+  btn.disabled = false;
+  // saveEntries()는 실패하면 formHint에 오류 메시지를 남긴다 — 그 경우엔 아직 저장되지
+  // 않은 것이므로 isDirty를 유지하고, "저장됨" 표시 대신 그 오류 메시지가 보이게 둔다.
+  const failed = hint && hint.textContent;
+  if(!failed){
+    isDirty = false;
+    clearTimeout(saveClickTimer);
+    btn.classList.remove('dirty');
+    btn.classList.add('done');
+    btn.textContent = '✓ 저장됨';
+    saveClickTimer = setTimeout(()=>{
+      updateSaveButtonUI();
+    }, 1500);
   }
+}
+
+function handleClearClick(){
+  // 실수로 버튼을 두 번 눌러 전체 기록이 통째로 사라지는 사고를 막기 위해,
+  // "다시 클릭" 방식 대신 "전체삭제"라는 글자를 정확히 입력해야만 실제로 삭제되도록 한다.
+  const typed = prompt('입고 내역을 전부 삭제합니다. 되돌릴 수 없습니다.\n\n계속하려면 아래에 "전체삭제"라고 입력하세요.');
+  if(typed === null) return; // 취소
+  const hint = document.getElementById('formHint');
+  if(typed.trim() !== '전체삭제'){
+    if(hint) hint.textContent = '입력한 내용이 "전체삭제"와 일치하지 않아 취소되었습니다.';
+    return;
+  }
+  if(hint) hint.textContent = '';
+  clearAllEntries();
 }
 
 async function clearAllEntries(){
   if(editingId) cancelEdit();
   entries = [];
-  await saveEntries();
+  markDirty();
   render();
 }
 
@@ -1066,16 +1088,6 @@ function renderLog(){
   }).join('');
 }
 
-function renderCounts(){
-  // 등록 "건수" = 몇 번 입력했는지(레코드 개수). 재고 수량(qty 합계)과는 다른 지표입니다.
-  const counts = { full: 0, half: 0, empty: 0 };
-  entries.forEach(e=>{ if(counts.hasOwnProperty(e.type)) counts[e.type]++; });
-  document.getElementById('cntTotal').textContent = entries.length;
-  document.getElementById('cntFull').textContent = counts.full;
-  document.getElementById('cntHalf').textContent = counts.half;
-  document.getElementById('cntEmpty').textContent = counts.empty;
-}
-
 function renderMemoStats(){
   const tbody = document.getElementById('memoStatsBody');
   const groups = {}; // memoKey -> { count, full, half, empty, total }
@@ -1110,7 +1122,6 @@ function renderMemoStats(){
 
 function render(){
   renderStats();
-  renderCounts();
   renderMemoStats();
   renderLog();
 }
