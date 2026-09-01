@@ -206,7 +206,7 @@
     min-width:0;
   }
   .qty-stepper input:focus{outline:none;}
-  input[type="date"], input[type="text"]{
+  input[type="date"], input[type="text"], select.select-input{
     width:100%;
     padding:10px 10px;
     border:1.5px solid var(--border);
@@ -216,9 +216,13 @@
     color:var(--ink);
     background:#fff;
   }
-  input[type="date"]:focus, input[type="text"]:focus{
+  input[type="date"]:focus, input[type="text"]:focus, select.select-input:focus{
     outline:none;
     border-color:var(--ink);
+  }
+  .capacity-field{
+    max-width:220px;
+    margin-top:14px;
   }
   .full-row{
     grid-column:1 / -1;
@@ -412,6 +416,19 @@
   .status-select:focus{outline:none;}
   .status-select.type-full{border-color:var(--full); color:var(--full);}
   .status-select.type-half{border-color:var(--half); color:#8a5c0f;}
+  .cap-select{
+    font-family:'JetBrains Mono',monospace;
+    font-weight:700;
+    font-size:12.5px;
+    padding:5px 8px;
+    border-radius:6px;
+    border:1.5px solid var(--half);
+    background:rgba(232,163,61,0.1);
+    color:#8a5c0f;
+    cursor:pointer;
+  }
+  .cap-select:focus{outline:none;}
+  .cap-dash{color:var(--muted);}
   tr.editing-row{background:rgba(217,72,15,0.06);}
   .cancel-edit-btn{
     margin-top:8px;
@@ -530,6 +547,22 @@
       </div>
     </div>
 
+    <div class="field capacity-field" id="capacityField" style="display:none;">
+      <label>용량 (L)</label>
+      <select class="select-input" id="fCapacity">
+        <option value="">선택</option>
+        <option value="100">100L</option>
+        <option value="200">200L</option>
+        <option value="300">300L</option>
+        <option value="400">400L</option>
+        <option value="500">500L</option>
+        <option value="600">600L</option>
+        <option value="700">700L</option>
+        <option value="800">800L</option>
+        <option value="900">900L</option>
+      </select>
+    </div>
+
     <div style="font-size:11.5px; color:var(--muted); margin-top:12px;">※ Full / 사용으로 등록하면 같은 수량만큼 빈톤백 재고에서 자동 차감됩니다.</div>
     <button class="submit-btn" id="submitBtn" onclick="submitEntry()">입고 등록</button>
     <button class="cancel-edit-btn" id="cancelEditBtn" style="display:none;" onclick="cancelEdit()">수정 취소</button>
@@ -589,6 +622,7 @@
             <th>No.</th>
             <th>날짜</th>
             <th>상태</th>
+            <th>용량</th>
             <th>수량</th>
             <th>메모</th>
             <th></th>
@@ -740,11 +774,27 @@ async function saveEntries(){
   }
 }
 
+const CAPACITY_OPTIONS = [100,200,300,400,500,600,700,800,900];
+
+function capacityOptionsHtml(selected){
+  const sel = selected ? String(selected) : '';
+  let html = `<option value="">선택</option>`;
+  html += CAPACITY_OPTIONS.map(v=>`<option value="${v}" ${String(v)===sel ? 'selected' : ''}>${v}L</option>`).join('');
+  return html;
+}
+
 function setType(type){
   currentType = type;
   document.querySelectorAll('.type-toggle button').forEach(b=>{
     b.classList.toggle('active', b.dataset.type === type);
   });
+  const capacityField = document.getElementById('capacityField');
+  if(type === 'half'){
+    capacityField.style.display = 'block';
+  } else {
+    capacityField.style.display = 'none';
+    document.getElementById('fCapacity').value = '';
+  }
 }
 
 function stepQty(delta){
@@ -778,6 +828,9 @@ function startEditEntry(id){
   document.getElementById('fQty').value = target.qty;
   document.getElementById('fMemo').value = target.memo || '';
   setType(target.type);
+  if(target.type === 'half'){
+    document.getElementById('fCapacity').value = target.capacity != null ? String(target.capacity) : '';
+  }
   document.getElementById('formPanelTitle').textContent = '입고 내역 수정';
   document.getElementById('editModeNote').classList.add('show');
   document.getElementById('submitBtn').textContent = '수정 완료';
@@ -811,6 +864,7 @@ async function submitEntry(){
   const dateEl = document.getElementById('fDate');
   const qtyEl = document.getElementById('fQty');
   const memoEl = document.getElementById('fMemo');
+  const capacityEl = document.getElementById('fCapacity');
 
   const date = dateEl.value || todayStr();
   const qty = parseInt(qtyEl.value, 10);
@@ -831,6 +885,16 @@ async function submitEntry(){
     }
   }
 
+  // "사용" 상태는 톤백 안에 남은 내용물 양을 L 단위(100~900)로 함께 기록한다.
+  let capacity = null;
+  if(currentType === 'half'){
+    if(!capacityEl.value){
+      hint.textContent = '사용 상태는 용량(L)을 선택해주세요.';
+      return;
+    }
+    capacity = Number(capacityEl.value);
+  }
+
   if(editingId){
     const idx = entries.findIndex(e => e.id === editingId);
     if(idx === -1){
@@ -838,7 +902,7 @@ async function submitEntry(){
       exitEditMode();
       return;
     }
-    entries[idx] = { ...entries[idx], date, type: currentType, qty, memo };
+    entries[idx] = { ...entries[idx], date, type: currentType, qty, memo, capacity };
     await saveEntries();
     exitEditMode();
   } else {
@@ -848,6 +912,7 @@ async function submitEntry(){
       type: currentType,
       qty,
       memo,
+      capacity,
       createdAt: Date.now()
     };
     entries.push(entry);
@@ -856,6 +921,7 @@ async function submitEntry(){
 
   qtyEl.value = 1;
   memoEl.value = '';
+  capacityEl.value = '';
   render();
 }
 
@@ -868,9 +934,29 @@ async function changeEntryType(selectEl){
   const entry = entries.find(e => e.id === id);
   if(!entry || entry.type === newType) return;
   entry.type = newType;
+  if(newType === 'full'){
+    // Full로 바뀌면 더 이상 "남은 용량"이 의미가 없으므로 지운다
+    entry.capacity = null;
+  }
   if(editingId === id){
     // 수정 폼이 이 항목을 열어둔 상태라면 폼의 종류 선택도 같이 맞춰준다
     setType(newType);
+    if(newType === 'half'){
+      document.getElementById('fCapacity').value = entry.capacity != null ? String(entry.capacity) : '';
+    }
+  }
+  await saveEntries();
+  render();
+}
+
+async function changeEntryCapacity(selectEl){
+  // 입고내역 표에서 "사용" 행의 용량(L)을 바로 드롭다운으로 바꾼다.
+  const id = selectEl.dataset.id;
+  const entry = entries.find(e => e.id === id);
+  if(!entry) return;
+  entry.capacity = selectEl.value ? Number(selectEl.value) : null;
+  if(editingId === id){
+    document.getElementById('fCapacity').value = selectEl.value;
   }
   await saveEntries();
   render();
@@ -937,7 +1023,7 @@ function renderLog(){
   const tbody = document.getElementById('logBody');
 
   if(entries.length === 0){
-    tbody.innerHTML = `<tr class="empty-row"><td colspan="6">기록이 없습니다. 위에서 입고를 등록해보세요.</td></tr>`;
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="7">기록이 없습니다. 위에서 입고를 등록해보세요.</td></tr>`;
     return;
   }
 
@@ -961,10 +1047,15 @@ function renderLog(){
           <option value="half" ${e.type==='half' ? 'selected' : ''}>◐ 사용</option>
         </select>`
       : `<span class="bagchip">${bagIcon(e.type, e.id)} ${typeLabel}</span>`;
+    // 용량(L)은 "사용" 상태일 때만 의미가 있으므로 그 외에는 "—"로 표시한다.
+    const capacityCell = (e.type === 'half')
+      ? `<select class="cap-select" data-id="${e.id}" onchange="changeEntryCapacity(this)">${capacityOptionsHtml(e.capacity)}</select>`
+      : `<span class="cap-dash">—</span>`;
     return `<tr${rowClass}>
       <td class="no">#${noStr}</td>
       <td>${e.date}</td>
       <td>${statusCell}</td>
+      <td>${capacityCell}</td>
       <td>${e.qty}개</td>
       <td class="memo-cell">${e.memo ? e.memo : '—'}</td>
       <td>
