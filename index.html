@@ -143,6 +143,108 @@
     letter-spacing:0.05em;
     margin-bottom:6px;
   }
+  .field-label-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:6px;
+  }
+  .field-label-row label{margin-bottom:0;}
+  .manage-toggle-btn{
+    background:none;
+    border:none;
+    color:var(--accent-in);
+    font-size:11.5px;
+    font-weight:700;
+    cursor:pointer;
+    padding:2px 4px;
+    font-family:'Inter',sans-serif;
+  }
+  .manage-toggle-btn:hover{text-decoration:underline;}
+  .waste-manage{
+    margin-top:10px;
+    padding:12px;
+    background:var(--bg);
+    border:1px solid var(--border);
+    border-radius:6px;
+  }
+  .waste-manage-list{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    margin-bottom:10px;
+  }
+  .waste-manage-empty{
+    font-size:12px;
+    color:var(--muted);
+    margin-bottom:10px;
+    font-family:'Inter',sans-serif;
+  }
+  .waste-chip{
+    display:flex;
+    align-items:center;
+    gap:2px;
+    background:#fff;
+    border:1.5px solid var(--border);
+    border-radius:20px;
+    padding:2px 4px 2px 10px;
+  }
+  .waste-chip input{
+    border:none;
+    background:transparent;
+    font-family:'JetBrains Mono',monospace;
+    font-size:12.5px;
+    font-weight:600;
+    color:var(--ink);
+    width:auto;
+    min-width:44px;
+    max-width:150px;
+    padding:4px 0;
+  }
+  .waste-chip input:focus{outline:none;}
+  .waste-chip-del{
+    background:none;
+    border:none;
+    color:var(--muted);
+    cursor:pointer;
+    font-size:13px;
+    padding:3px 7px;
+    border-radius:50%;
+    line-height:1;
+  }
+  .waste-chip-del:hover{color:var(--danger); background:rgba(179,38,30,0.08);}
+  .waste-manage-add{
+    display:flex;
+    gap:8px;
+  }
+  .waste-manage-add input{
+    flex:1;
+    padding:8px 10px;
+    border:1.5px solid var(--border);
+    border-radius:6px;
+    font-family:'Inter',sans-serif;
+    font-size:13px;
+    background:#fff;
+  }
+  .waste-manage-add input:focus{outline:none; border-color:var(--ink);}
+  .waste-manage-add button{
+    padding:8px 14px;
+    border:none;
+    border-radius:6px;
+    background:var(--ink);
+    color:#fff;
+    font-weight:600;
+    font-size:12.5px;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .waste-manage-add button:hover{opacity:0.85;}
+  .waste-manage-hint{
+    font-size:11px;
+    color:var(--muted);
+    margin-top:8px;
+    font-family:'Inter',sans-serif;
+  }
   .type-toggle{
     display:flex;
     gap:6px;
@@ -251,7 +353,7 @@
     min-height:16px;
   }
 
-  /* ---- Memo stats ---- */
+  /* ---- Waste stats ---- */
   .memo-stats-table{
     width:100%;
     border-collapse:collapse;
@@ -412,6 +514,19 @@
   }
   .cap-select:focus{outline:none;}
   .cap-dash{color:var(--muted);}
+  .memo-select{
+    font-family:'JetBrains Mono',monospace;
+    font-weight:700;
+    font-size:12.5px;
+    padding:5px 8px;
+    border-radius:6px;
+    border:1.5px solid var(--border);
+    background:#fff;
+    color:var(--ink);
+    cursor:pointer;
+    max-width:150px;
+  }
+  .memo-select:focus{outline:none; border-color:var(--ink);}
   tr.editing-row{background:rgba(217,72,15,0.06);}
   .cancel-edit-btn{
     margin-top:8px;
@@ -525,8 +640,22 @@
         </div>
       </div>
       <div class="field full-row">
-        <label>메모 (선택)</label>
-        <input type="text" id="fMemo" placeholder="예: 3공장 반입, A현장 등">
+        <div class="field-label-row">
+          <label>폐용매 (선택)</label>
+          <button type="button" class="manage-toggle-btn" id="wasteManageToggleBtn" onclick="toggleWasteManage()">⚙ 목록 관리</button>
+        </div>
+        <select class="select-input" id="fMemo" onchange="handleMemoSelectChange(this)">
+          <option value="">선택</option>
+        </select>
+        <input type="text" id="fMemoOther" class="select-input" style="display:none; margin-top:8px;" placeholder="폐용매 이름을 직접 입력하세요">
+        <div class="waste-manage" id="wasteManagePanel" style="display:none;">
+          <div class="waste-manage-list" id="wasteManageList"></div>
+          <div class="waste-manage-add">
+            <input type="text" id="newWasteInput" placeholder="새 폐용매 이름 입력 (예: DMF)" onkeydown="if(event.key==='Enter'){event.preventDefault(); addWastePreset();}">
+            <button type="button" onclick="addWastePreset()">추가</button>
+          </div>
+          <div class="waste-manage-hint">이름 칸을 직접 고쳐서 수정하고, ✕로 삭제할 수 있습니다. 목록 변경도 하단 "저장" 버튼을 눌러야 모두에게 반영됩니다.</div>
+        </div>
       </div>
     </div>
 
@@ -553,12 +682,12 @@
   </div>
 
   <div class="panel">
-    <div class="panel-title">메모별 통계</div>
+    <div class="panel-title">폐용매 통계</div>
     <div class="log-scroll" style="max-height:none;">
       <table class="memo-stats-table" id="memoStatsTable">
         <thead>
           <tr>
-            <th>메모</th>
+            <th>폐용매</th>
             <th style="text-align:right;">건수</th>
             <th style="text-align:right;">Full</th>
             <th style="text-align:right;">사용</th>
@@ -588,7 +717,7 @@
             <th>상태</th>
             <th>용량</th>
             <th>수량</th>
-            <th>메모</th>
+            <th>폐용매</th>
             <th></th>
           </tr>
         </thead>
@@ -602,11 +731,19 @@
 
 <script>
 const STORAGE_KEY = 'tonbag_entries'; // Firebase 연결 실패시에만 쓰는 로컬(이 브라우저 전용) 백업 키
+const PRESETS_STORAGE_KEY = 'tonbag_waste_presets'; // 폐용매 목록의 로컬 백업 키 (Firebase 실패시에만 사용)
 const TYPE_LABELS = { full: 'Full', half: '사용', empty: '빈백' };
 const TYPE_RATIO = { full: 1, half: 0.5, empty: 0 };
 const TYPE_COLOR_VAR = { full: '--full', half: '--half', empty: '--empty' };
+// 처음 시작할 때 기본으로 들어있는 폐용매 목록. 이후에는 "목록 관리"에서
+// 자유롭게 추가/수정/삭제할 수 있고, 그 결과가 wastePresets에 저장된다.
+const DEFAULT_WASTE_PRESETS = ['EtOH+EA','MeOH','EA+TOL','ACT','XY','XY+ACT','TOL+MeOH','TOL','MeOH+ACT'];
+// 목록에 없는 폐용매를 그때그때 직접 입력할 수 있도록 하는 특수 옵션 값
+const OTHER_VALUE = '__other__';
 
 let entries = [];
+let wastePresets = DEFAULT_WASTE_PRESETS.slice();
+let wasteManageOpen = false;
 let currentType = 'full';
 let editingId = null; // 현재 "입고내역"에서 수정 중인 항목의 id (null이면 신규 등록 모드)
 let isDirty = false; // "저장" 버튼을 누르기 전까지의, 아직 저장되지 않은 변경사항이 있는지 여부
@@ -624,6 +761,8 @@ let isDirty = false; // "저장" 버튼을 누르기 전까지의, 아직 저장
      누군가 입고를 등록하면 다른 사람 화면에도 새로고침 없이 바로 반영됩니다.
      (단, 아주 짧은 순간 두 명이 동시에 저장하면 나중 저장이 앞선 저장을
      덮어쓸 수 있습니다 — 소규모 사내 사용 기준으로는 문제되지 않는 수준)
+   - 폐용매 목록(wastePresets)도 같은 문서에 함께 저장되어, 한 사람이
+     "목록 관리"에서 추가/수정/삭제하고 저장하면 모두의 드롭다운에 반영됩니다.
 ============================================================ */
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyBtf8lX15eLMRVKthHEzjl4pJKJTq5gVvk",
@@ -687,18 +826,31 @@ function todayStr(){
   return d.toISOString().slice(0,10);
 }
 
+function escapeHtml(str){
+  return String(str).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+
 function sanitizeEntries(list){
   return (Array.isArray(list) ? list : []).filter(e => e && TYPE_LABELS[e.type]);
 }
 
+function sanitizeWastePresets(list){
+  if(!Array.isArray(list)) return DEFAULT_WASTE_PRESETS.slice();
+  const cleaned = list.filter(v => typeof v === 'string' && v.trim()).map(v => v.trim());
+  return cleaned;
+}
+
 async function loadEntries(){
-  // Firebase 모드에서는 subscribeEntries()의 실시간 구독이 entries를 채우고
-  // render()도 그쪽에서 호출하므로, 이 함수는 로컬(localStorage) 모드에서만 쓰인다.
+  // Firebase 모드에서는 subscribeEntries()의 실시간 구독이 entries/wastePresets를
+  // 채우고 render()도 그쪽에서 호출하므로, 이 함수는 로컬(localStorage) 모드에서만 쓰인다.
   try{
     const raw = localStorage.getItem(STORAGE_KEY);
     entries = sanitizeEntries(raw ? JSON.parse(raw) : []);
+    const rawPresets = localStorage.getItem(PRESETS_STORAGE_KEY);
+    wastePresets = rawPresets ? sanitizeWastePresets(JSON.parse(rawPresets)) : DEFAULT_WASTE_PRESETS.slice();
   }catch(e){
     entries = [];
+    wastePresets = DEFAULT_WASTE_PRESETS.slice();
   }
   render();
 }
@@ -716,6 +868,8 @@ function subscribeEntries(){
       }
       const data = snap.exists ? snap.data() : null;
       entries = sanitizeEntries(data && data.entries);
+      const presetsFromDb = data && data.wastePresets;
+      wastePresets = Array.isArray(presetsFromDb) ? sanitizeWastePresets(presetsFromDb) : DEFAULT_WASTE_PRESETS.slice();
       render();
     },
     err => {
@@ -728,7 +882,7 @@ function subscribeEntries(){
 async function saveEntries(){
   if(useFirebase && firebaseDb){
     try{
-      await tonbagDocRef().set({ entries, updatedAt: Date.now() });
+      await tonbagDocRef().set({ entries, wastePresets, updatedAt: Date.now() });
       // 화면 갱신은 subscribeEntries()의 onSnapshot이 처리한다
       // (다른 사람이 등록한 내용도 똑같은 방식으로 실시간 반영됨)
       return;
@@ -740,13 +894,14 @@ async function saveEntries(){
   }
   try{
     localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+    localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(wastePresets));
   }catch(e){
     document.getElementById('formHint').textContent = '저장 중 오류가 발생했습니다. (브라우저 저장공간이 가득 찼거나 시크릿 모드일 수 있어요)';
   }
 }
 
-// "저장" 버튼을 눌러야만 실제로 저장되도록 바뀌면서, 등록/수정/삭제는 화면(메모리)에서만
-// 바뀌고 바로 저장되지 않는다. 저장 전 상태를 버튼 색/문구로 계속 보여준다.
+// "저장" 버튼을 눌러야만 실제로 저장되도록 바뀌면서, 등록/수정/삭제(폐용매 목록 변경 포함)는
+// 화면(메모리)에서만 바뀌고 바로 저장되지 않는다. 저장 전 상태를 버튼 색/문구로 계속 보여준다.
 let saveClickTimer = null;
 function updateSaveButtonUI(){
   const btn = document.getElementById('saveBtn');
@@ -781,6 +936,98 @@ function capacityOptionsHtml(selected){
   let html = `<option value="">선택</option>`;
   html += CAPACITY_OPTIONS.map(v=>`<option value="${v}" ${String(v)===sel ? 'selected' : ''}>${v}L</option>`).join('');
   return html;
+}
+
+/* ---- 폐용매(메모) 드롭다운 & 목록 관리 ---- */
+
+// 폐용매 <select>용 <option> 목록을 만든다. selected 값이 현재 목록(wastePresets)에
+// 없어도(과거 자유 입력 데이터, 또는 삭제된 항목) 사라지지 않도록 "(목록에 없음)"
+// 표시로 임시 옵션을 하나 더 붙여준다. 입고 등록 폼(#fMemo)과 입고 내역 표의 각 행
+// 드롭다운이 모두 이 함수를 공유한다.
+function wasteOptionsHtml(selected){
+  let html = `<option value="">선택</option>`;
+  html += wastePresets.map(p => `<option value="${escapeHtml(p)}" ${p===selected ? 'selected' : ''}>${escapeHtml(p)}</option>`).join('');
+  html += `<option value="${OTHER_VALUE}">✎ 기타 (직접 입력)</option>`;
+  if(selected && selected !== OTHER_VALUE && !wastePresets.includes(selected)){
+    html += `<option value="${escapeHtml(selected)}" selected>${escapeHtml(selected)} (목록에 없음)</option>`;
+  }
+  return html;
+}
+
+// 입고 등록 폼에서 "기타"를 고르면 직접 입력창을 보여주고, 다른 값을 고르면 숨긴다.
+function handleMemoSelectChange(selectEl){
+  const otherInput = document.getElementById('fMemoOther');
+  if(!otherInput) return;
+  if(selectEl.value === OTHER_VALUE){
+    otherInput.style.display = 'block';
+    otherInput.value = '';
+    otherInput.focus();
+  } else {
+    otherInput.style.display = 'none';
+    otherInput.value = '';
+  }
+}
+
+function renderWasteSelect(){
+  const select = document.getElementById('fMemo');
+  if(!select) return;
+  select.innerHTML = wasteOptionsHtml(select.value);
+}
+
+function toggleWasteManage(){
+  wasteManageOpen = !wasteManageOpen;
+  document.getElementById('wasteManagePanel').style.display = wasteManageOpen ? 'block' : 'none';
+  document.getElementById('wasteManageToggleBtn').textContent = wasteManageOpen ? '⚙ 목록 관리 닫기' : '⚙ 목록 관리';
+  if(wasteManageOpen) renderWasteManageList();
+}
+
+function renderWasteManageList(){
+  const list = document.getElementById('wasteManageList');
+  if(!list) return;
+  if(wastePresets.length === 0){
+    list.innerHTML = `<div class="waste-manage-empty">등록된 폐용매가 없습니다. 아래에서 추가해주세요.</div>`;
+    return;
+  }
+  list.innerHTML = wastePresets.map((p, idx) => `
+    <div class="waste-chip">
+      <input type="text" value="${escapeHtml(p)}" data-idx="${idx}" onchange="renameWastePreset(this)">
+      <button type="button" class="waste-chip-del" onclick="deleteWastePreset(${idx})" title="삭제">✕</button>
+    </div>
+  `).join('');
+}
+
+function addWastePreset(){
+  const input = document.getElementById('newWasteInput');
+  const val = input.value.trim();
+  if(!val) return;
+  if(wastePresets.includes(val)){
+    input.value = '';
+    return;
+  }
+  wastePresets.push(val);
+  input.value = '';
+  markDirty();
+  renderWasteManageList();
+  renderWasteSelect();
+}
+
+function renameWastePreset(inputEl){
+  const idx = Number(inputEl.dataset.idx);
+  const val = inputEl.value.trim();
+  if(!val){
+    inputEl.value = wastePresets[idx]; // 빈 값으로는 바꿀 수 없음 — 원래 값으로 되돌림
+    return;
+  }
+  wastePresets[idx] = val;
+  markDirty();
+  renderWasteSelect();
+}
+
+function deleteWastePreset(idx){
+  wastePresets.splice(idx, 1);
+  markDirty();
+  renderWasteManageList();
+  renderWasteSelect();
 }
 
 function setType(type){
@@ -826,7 +1073,10 @@ function startEditEntry(id){
   editingId = id;
   document.getElementById('fDate').value = target.date;
   document.getElementById('fQty').value = target.qty;
+  document.getElementById('fMemo').innerHTML = wasteOptionsHtml(target.memo || '');
   document.getElementById('fMemo').value = target.memo || '';
+  document.getElementById('fMemoOther').style.display = 'none';
+  document.getElementById('fMemoOther').value = '';
   setType(target.type);
   if(target.type === 'half'){
     document.getElementById('fCapacity').value = target.capacity != null ? String(target.capacity) : '';
@@ -852,6 +1102,8 @@ function cancelEdit(){
   document.getElementById('fDate').value = todayStr();
   document.getElementById('fQty').value = 1;
   document.getElementById('fMemo').value = '';
+  document.getElementById('fMemoOther').style.display = 'none';
+  document.getElementById('fMemoOther').value = '';
   setType('full');
   document.getElementById('formHint').textContent = '';
   render();
@@ -864,15 +1116,25 @@ async function submitEntry(){
   const dateEl = document.getElementById('fDate');
   const qtyEl = document.getElementById('fQty');
   const memoEl = document.getElementById('fMemo');
+  const memoOtherEl = document.getElementById('fMemoOther');
   const capacityEl = document.getElementById('fCapacity');
 
   const date = dateEl.value || todayStr();
   const qty = parseInt(qtyEl.value, 10);
-  const memo = memoEl.value.trim();
+  let memo = memoEl.value.trim();
 
   if(!qty || qty <= 0){
     hint.textContent = '수량을 1개 이상 입력해주세요.';
     return;
+  }
+
+  // "기타"를 골랐다면 직접 입력한 이름을 폐용매 값으로 사용한다.
+  if(memo === OTHER_VALUE){
+    memo = memoOtherEl.value.trim();
+    if(!memo){
+      hint.textContent = '폐용매를 "기타"로 선택하셨다면 이름을 입력해주세요.';
+      return;
+    }
   }
 
   if(currentType === 'full' || currentType === 'half'){
@@ -921,6 +1183,8 @@ async function submitEntry(){
 
   qtyEl.value = 1;
   memoEl.value = '';
+  memoOtherEl.style.display = 'none';
+  memoOtherEl.value = '';
   capacityEl.value = '';
   render();
 }
@@ -962,6 +1226,37 @@ async function changeEntryCapacity(selectEl){
   render();
 }
 
+async function changeEntryMemo(selectEl){
+  // 입고내역 표에서 Full/사용 행의 폐용매를 바로 드롭다운으로 바꾼다.
+  // 빈백은 폐용매 자체가 없는 항목이라 이 드롭다운 대상에서 제외한다(표에는 "—"로 표시).
+  const id = selectEl.dataset.id;
+  const entry = entries.find(e => e.id === id);
+  if(!entry) return;
+
+  let value = selectEl.value;
+  if(value === OTHER_VALUE){
+    // 표에서는 별도 입력칸을 둘 자리가 없으므로, "기타"를 고르면 바로 입력창을 띄운다.
+    const typed = prompt('폐용매 이름을 입력하세요.', (entry.memo && !wastePresets.includes(entry.memo)) ? entry.memo : '');
+    if(typed === null || !typed.trim()){
+      // 취소했거나 빈 값이면 원래 선택으로 되돌린다
+      selectEl.innerHTML = wasteOptionsHtml(entry.memo);
+      selectEl.value = entry.memo;
+      return;
+    }
+    value = typed.trim();
+  }
+
+  entry.memo = value;
+  if(editingId === id){
+    document.getElementById('fMemo').innerHTML = wasteOptionsHtml(entry.memo);
+    document.getElementById('fMemo').value = entry.memo;
+    document.getElementById('fMemoOther').style.display = 'none';
+    document.getElementById('fMemoOther').value = '';
+  }
+  markDirty();
+  render();
+}
+
 async function deleteEntry(id){
   if(editingId === id) cancelEdit();
   entries = entries.filter(e => e.id !== id);
@@ -969,9 +1264,10 @@ async function deleteEntry(id){
   render();
 }
 
-// 등록/수정/삭제/전체삭제는 전부 화면(메모리)에만 반영되고, 이 "저장" 버튼을 눌러야만
-// 실제로 공유 저장소(또는 이 브라우저)에 저장된다. 새로고침하거나 저장 없이 창을 닫으면
-// 저장 버튼을 누르기 전 변경사항은 사라진다(그래서 beforeunload 경고도 함께 걸어둔다).
+// 등록/수정/삭제/전체삭제/폐용매 목록 변경은 전부 화면(메모리)에만 반영되고, 이 "저장"
+// 버튼을 눌러야만 실제로 공유 저장소(또는 이 브라우저)에 저장된다. 새로고침하거나 저장
+// 없이 창을 닫으면 저장 버튼을 누르기 전 변경사항은 사라진다(그래서 beforeunload 경고도
+// 함께 걸어둔다).
 async function handleSaveClick(){
   const btn = document.getElementById('saveBtn');
   const hint = document.getElementById('formHint');
@@ -1073,13 +1369,18 @@ function renderLog(){
     const capacityCell = (e.type === 'half')
       ? `<select class="cap-select" data-id="${e.id}" onchange="changeEntryCapacity(this)">${capacityOptionsHtml(e.capacity)}</select>`
       : `<span class="cap-dash">—</span>`;
+    // 폐용매도 Full/사용 행에서는 표에서 바로 드롭다운으로 바꿀 수 있다. 빈백은
+    // 폐용매 자체가 없는 항목이라 제외하고 "—"로 표시한다.
+    const memoCell = (e.type === 'full' || e.type === 'half')
+      ? `<select class="memo-select" data-id="${e.id}" onchange="changeEntryMemo(this)">${wasteOptionsHtml(e.memo)}</select>`
+      : `<span class="cap-dash">—</span>`;
     return `<tr${rowClass}>
       <td class="no">#${noStr}</td>
       <td>${e.date}</td>
       <td>${statusCell}</td>
       <td>${capacityCell}</td>
       <td>${e.qty}개</td>
-      <td class="memo-cell">${e.memo ? e.memo : '—'}</td>
+      <td>${memoCell}</td>
       <td>
         <button class="edit-btn" onclick="startEditEntry('${e.id}')" title="수정">✎</button>
         <button class="del-btn" onclick="deleteEntry('${e.id}')" title="삭제">✕</button>
@@ -1093,7 +1394,7 @@ function renderMemoStats(){
   const groups = {}; // memoKey -> { count, full, half, empty, total }
 
   entries.forEach(e=>{
-    const key = e.memo && e.memo.trim() ? e.memo.trim() : '(메모 없음)';
+    const key = e.memo && e.memo.trim() ? e.memo.trim() : '(폐용매 없음)';
     if(!groups[key]) groups[key] = { count:0, full:0, half:0, empty:0, total:0 };
     groups[key].count += 1;
     groups[key][e.type] += e.qty;
@@ -1121,6 +1422,8 @@ function renderMemoStats(){
 }
 
 function render(){
+  renderWasteSelect();
+  if(wasteManageOpen) renderWasteManageList();
   renderStats();
   renderMemoStats();
   renderLog();
