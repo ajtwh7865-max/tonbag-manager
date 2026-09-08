@@ -737,9 +737,17 @@ const TYPE_RATIO = { full: 1, half: 0.5, empty: 0 };
 const TYPE_COLOR_VAR = { full: '--full', half: '--half', empty: '--empty' };
 // 처음 시작할 때 기본으로 들어있는 폐용매 목록. 이후에는 "목록 관리"에서
 // 자유롭게 추가/수정/삭제할 수 있고, 그 결과가 wastePresets에 저장된다.
-const DEFAULT_WASTE_PRESETS = ['EtOH+EA','MeOH','EA+TOL','ACT','XY','XY+ACT','TOL+MeOH','TOL','MeOH+ACT'];
+const DEFAULT_WASTE_PRESETS = ['EA+EtOH','MeOH','EA+TOL','ACT','XY','XY+ACT','TOL+MeOH','TOL','MeOH+ACT'];
 // 목록에 없는 폐용매를 그때그때 직접 입력할 수 있도록 하는 특수 옵션 값
 const OTHER_VALUE = '__other__';
+// 예전 표기를 새 표기로 자동 교정하기 위한 이름 매핑. 공유 저장소(Firestore)에
+// 예전 이름으로 이미 저장되어 있으면 DEFAULT_WASTE_PRESETS만 바꿔서는 화면에
+// 반영되지 않으므로, 불러온 데이터(wastePresets, 각 기록의 memo)에도 이 매핑을
+// 적용해서 예전 이름이 보이면 자동으로 새 이름으로 바꿔준다.
+const LEGACY_WASTE_RENAMES = { 'EtOH+EA': 'EA+EtOH' };
+function applyLegacyWasteRenames(value){
+  return Object.prototype.hasOwnProperty.call(LEGACY_WASTE_RENAMES, value) ? LEGACY_WASTE_RENAMES[value] : value;
+}
 
 let entries = [];
 let wastePresets = DEFAULT_WASTE_PRESETS.slice();
@@ -831,13 +839,26 @@ function escapeHtml(str){
 }
 
 function sanitizeEntries(list){
-  return (Array.isArray(list) ? list : []).filter(e => e && TYPE_LABELS[e.type]);
+  return (Array.isArray(list) ? list : [])
+    .filter(e => e && TYPE_LABELS[e.type])
+    .map(e => (typeof e.memo === 'string' ? { ...e, memo: applyLegacyWasteRenames(e.memo) } : e));
 }
 
 function sanitizeWastePresets(list){
   if(!Array.isArray(list)) return DEFAULT_WASTE_PRESETS.slice();
-  const cleaned = list.filter(v => typeof v === 'string' && v.trim()).map(v => v.trim());
-  return cleaned;
+  const cleaned = list.filter(v => typeof v === 'string' && v.trim()).map(v => applyLegacyWasteRenames(v.trim()));
+  // 이름 교정 과정에서 같은 이름이 중복될 수 있으므로, 먼저 나온 순서를 유지하며 제거한다.
+  const seen = new Set();
+  const deduped = [];
+  cleaned.forEach(v => { if(!seen.has(v)){ seen.add(v); deduped.push(v); } });
+  return deduped;
+}
+
+function hasLegacyPresetNames(list){
+  return Array.isArray(list) && list.some(v => typeof v === 'string' && Object.prototype.hasOwnProperty.call(LEGACY_WASTE_RENAMES, v.trim()));
+}
+function hasLegacyEntryMemos(list){
+  return Array.isArray(list) && list.some(e => e && typeof e.memo === 'string' && Object.prototype.hasOwnProperty.call(LEGACY_WASTE_RENAMES, e.memo));
 }
 
 async function loadEntries(){
@@ -845,9 +866,16 @@ async function loadEntries(){
   // 채우고 render()도 그쪽에서 호출하므로, 이 함수는 로컬(localStorage) 모드에서만 쓰인다.
   try{
     const raw = localStorage.getItem(STORAGE_KEY);
-    entries = sanitizeEntries(raw ? JSON.parse(raw) : []);
+    const rawEntriesList = raw ? JSON.parse(raw) : [];
+    entries = sanitizeEntries(rawEntriesList);
     const rawPresets = localStorage.getItem(PRESETS_STORAGE_KEY);
-    wastePresets = rawPresets ? sanitizeWastePresets(JSON.parse(rawPresets)) : DEFAULT_WASTE_PRESETS.slice();
+    const rawPresetsList = rawPresets ? JSON.parse(rawPresets) : null;
+    wastePresets = rawPresetsList ? sanitizeWastePresets(rawPresetsList) : DEFAULT_WASTE_PRESETS.slice();
+    if(hasLegacyPresetNames(rawPresetsList) || hasLegacyEntryMemos(rawEntriesList)){
+      // 예전 폐용매 이름("EtOH+EA" 등)이 저장되어 있던 경우, 새 이름으로 교정한 내용을
+      // 사용자 조작 없이 조용히 다시 저장해서 다음에도 새 이름으로 남도록 한다.
+      saveEntries();
+    }
   }catch(e){
     entries = [];
     wastePresets = DEFAULT_WASTE_PRESETS.slice();
@@ -867,10 +895,16 @@ function subscribeEntries(){
         return;
       }
       const data = snap.exists ? snap.data() : null;
-      entries = sanitizeEntries(data && data.entries);
+      const rawEntriesList = data && data.entries;
       const presetsFromDb = data && data.wastePresets;
+      entries = sanitizeEntries(rawEntriesList);
       wastePresets = Array.isArray(presetsFromDb) ? sanitizeWastePresets(presetsFromDb) : DEFAULT_WASTE_PRESETS.slice();
       render();
+      if(hasLegacyPresetNames(presetsFromDb) || hasLegacyEntryMemos(rawEntriesList)){
+        // 공유 저장소에 예전 폐용매 이름("EtOH+EA" 등)이 남아있던 경우, 새 이름으로
+        // 교정한 내용을 조용히 다시 저장해서 모두의 화면에 새 이름이 반영되게 한다.
+        saveEntries();
+      }
     },
     err => {
       console.error('[톤백 관리대장] 실시간 동기화 오류', err);
