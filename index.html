@@ -1649,11 +1649,11 @@ function renderCalendarAlerts(){
           return `<span class="alert-solvent-badge">${escapeHtml(s)}</span>${tonbagAvailabilityBadgeHtml(s)}${missingBadge}`;
         }).join('');
       } else {
-        solventsHtml = `<span class="alert-solvent-badge unknown">매핑 정보 없음</span>`;
+        solventsHtml = '';
       }
       return `<div class="cal-cell-card" title="${escapeHtml(m.title)}">
         <div class="cal-cell-code">${escapeHtml(m.code)}${dayNote ? ` <span class="cal-cell-daynote">(${dayNote})</span>` : ''}</div>
-        <div class="cal-solvents">${solventsHtml}</div>
+        ${solventsHtml ? `<div class="cal-solvents">${solventsHtml}</div>` : ''}
       </div>`;
     }).join('');
     const classes = ['cal-cell'];
