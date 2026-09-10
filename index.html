@@ -766,6 +766,17 @@
     padding:2px 9px;
     margin:2px 4px 2px 0;
   }
+  .alert-diag{
+    font-family:'Inter',sans-serif;
+    font-size:12px;
+    line-height:1.8;
+    color:#6B4E10;
+    background:rgba(232,163,61,0.14);
+    border:1.5px solid rgba(232,163,61,0.5);
+    border-radius:6px;
+    padding:10px 12px;
+    margin-bottom:14px;
+  }
   .alert-empty{
     font-size:12.5px;
     color:var(--muted);
@@ -1457,6 +1468,16 @@ function collectBatchDates(batchKey, allEvents){
 
 // 지정한 날짜(targetDate)에 해당하는 생산 이벤트들을 찾아서, 품목 코드/며칠째인지/
 // 예상 폐용매를 계산해 배열로 돌려준다.
+// 캘린더에 "품목코드 + 정제"라고 적힌 이벤트만 카드로 보여주기 위한 필터.
+// (예: "G0720RE-260801 1차정제"는 보여주고, 같은 배치의 "건조"/"라벨링"/
+// "포장" 같은 다른 공정 이벤트는 화면에 카드로 띄우지 않는다. 단, "며칠째"
+// 계산(collectBatchDates)은 이 필터와 무관하게 같은 배치의 모든 이벤트 —
+// 정제가 아닌 공정도 포함 — 를 그대로 사용해야 정확하므로 이 필터는 오직
+// "이 이벤트를 카드로 표시할지"에만 적용한다.)
+function isRefiningTitle(title){
+  return String(title || '').indexOf('정제') !== -1;
+}
+
 function matchEventsForDate(targetDate){
   const target = dateOnly(targetDate);
   const results = [];
@@ -1464,6 +1485,7 @@ function matchEventsForDate(targetDate){
     const title = ev.summary || '(제목 없음)';
     const code = findProductCode(title);
     if(!code) return;
+    if(!isRefiningTitle(title)) return;
     const range = parseEventDateRange(ev);
     if(!range) return;
     if(target < range.start || target >= range.end) return;
@@ -1599,6 +1621,19 @@ function renderCalendarAlerts(){
       }</div>`
     : '';
 
+  // 진단 메시지: 캘린더 연동(fetch) 자체는 성공했는데(state==='ok') 화면에
+  // 아무 일정도 안 뜨면 사용자 입장에서는 "연동이 안 된다"처럼 보인다. 이걸
+  // 구분하기 위해 ① 이 달 기간에 캘린더 일정이 아예 0건 조회됐는지, ② 일정은
+  // 있는데 등록된 품목 코드와 제목이 일치하는 게 하나도 없는지를 알려준다.
+  const totalMatchedCards = days.reduce((sum, d) => sum + matchEventsForDate(d).length, 0);
+  let diagHtml = '';
+  if(calendarEvents.length === 0){
+    diagHtml = `<div class="alert-diag">ℹ 캘린더 연동은 정상 작동했지만(마지막 확인 ${calendarLastCheckedAt ? new Date(calendarLastCheckedAt).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}) : '-'}), ${formatDateLabel(gridStart)}~${formatDateLabel(gridEnd)} 기간에 구글 캘린더에서 조회된 일정이 0건입니다. 이 기간에 실제로 등록된 일정이 있는지, 캘린더가 "공개"로 설정되어 있는지 확인해주세요.</div>`;
+  } else if(totalMatchedCards === 0){
+    const sampleTitles = calendarEvents.slice(0, 5).map(ev => ev.summary || '(제목 없음)');
+    diagHtml = `<div class="alert-diag">ℹ 구글 캘린더에서 이 달 일정 ${calendarEvents.length}건을 불러왔지만, "⚙ 품목 매핑 관리"에 등록된 품목 코드와 일치하는 제목이 하나도 없어 캘린더에 표시되지 않았습니다. 불러온 일정 제목 예시: ${sampleTitles.map(t=>`<span class="alert-missing-item">${escapeHtml(t)}</span>`).join(' ')} — 일정 제목에 품목 코드가 포함되어 있는지, 품목 매핑에 등록된 코드 표기와 일치하는지 확인해주세요.</div>`;
+  }
+
   const cellsHtml = days.map(d=>{
     const dOnly = dateOnly(d);
     const isToday = dOnly.getTime() === today.getTime();
@@ -1630,7 +1665,7 @@ function renderCalendarAlerts(){
     </div>`;
   }).join('');
 
-  body.innerHTML = navHtml + missingBannerHtml + `<div class="cal-grid">${weekdayHtml}${cellsHtml}</div>`;
+  body.innerHTML = navHtml + diagHtml + missingBannerHtml + `<div class="cal-grid">${weekdayHtml}${cellsHtml}</div>`;
 }
 
 // 구글 캘린더 REST API에서, 현재 화면에 표시 중인 달(calendarViewMonth)의 달력
