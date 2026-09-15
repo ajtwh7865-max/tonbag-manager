@@ -756,7 +756,9 @@
     margin-bottom:14px;
   }
   .alert-missing-item{
-    display:inline-block;
+    display:inline-flex;
+    align-items:center;
+    gap:5px;
     font-family:'JetBrains Mono',monospace;
     font-weight:700;
     font-size:11px;
@@ -765,6 +767,16 @@
     border-radius:14px;
     padding:2px 9px;
     margin:2px 4px 2px 0;
+    cursor:pointer;
+    user-select:none;
+  }
+  .alert-missing-checkbox{
+    width:13px;
+    height:13px;
+    margin:0;
+    cursor:pointer;
+    accent-color:var(--danger);
+    flex:none;
   }
   .alert-diag{
     font-family:'Inter',sans-serif;
@@ -1022,6 +1034,7 @@ const STORAGE_KEY = 'tonbag_entries'; // Firebase 연결 실패시에만 쓰는 
 const PRESETS_STORAGE_KEY = 'tonbag_waste_presets'; // 폐용매 목록의 로컬 백업 키 (Firebase 실패시에만 사용)
 const PRODUCT_MAP_STORAGE_KEY = 'tonbag_product_waste_map'; // 품목→폐용매 매핑의 로컬 백업 키 (Firebase 실패시에만 사용)
 const CALENDAR_CONFIG_STORAGE_KEY = 'tonbag_calendar_config'; // 캘린더 연동 설정(ID/API키)의 로컬 백업 키 (Firebase 실패시에만 사용)
+const DISMISSED_MISSING_STORAGE_KEY = 'tonbag_dismissed_missing'; // "폐액 미기입" 체크(확인 완료 처리)한 항목의 로컬 백업 키 (Firebase 실패시에만 사용)
 const TYPE_LABELS = { full: 'Full', half: '사용', empty: '빈백' };
 const TYPE_RATIO = { full: 1, half: 0.5, empty: 0 };
 const TYPE_COLOR_VAR = { full: '--full', half: '--half', empty: '--empty' };
@@ -1057,6 +1070,7 @@ const DEFAULT_PRODUCT_WASTE_MAP = {
   'HTM-K940': { 1: ['EA+TOL'] },
   'C383': { 1: ['ACT'] },
   'O0330': { 1: ['ACT'] },
+  'O0830': { 1: ['EA+TOL'] },
   'LX0566': { 1: ['XY'], 2: ['XY+ACT'] },
   'LX0556': { 1: ['TOL+MeOH'] },
   'G0720': { 2: ['TOL', 'MeOH+ACT'] }
@@ -1075,6 +1089,7 @@ let calendarFetchError = '';
 let calendarLastCheckedAt = null;
 let calendarAutoFetchDone = false; // 설정이 처음 로드됐을 때 한 번만 자동으로 불러오기 위한 플래그
 let calendarViewMonth = null; // 현재 달력에 표시 중인 달의 1일(Date). null이면 이번 달.
+let dismissedMissingKeys = new Set(); // "폐액 미기입" 목록에서 체크박스로 확인 처리한 항목(날짜|품목코드|폐용매) 키 모음
 let wasteManageOpen = false;
 let productManageOpen = false;
 let calendarSettingsOpen = false;
@@ -1218,6 +1233,12 @@ function sanitizeCalendarConfig(obj){
   return { calendarId, apiKey };
 }
 
+// "폐액 미기입" 체크(확인 완료 처리) 목록을 저장소에서 불러올 때, 배열이 아니거나
+// 문자열이 아닌 값이 섞여 있어도 안전하게 Set으로 만들어준다.
+function sanitizeDismissedMissing(raw){
+  return new Set(Array.isArray(raw) ? raw.filter(x => typeof x === 'string') : []);
+}
+
 async function loadEntries(){
   // Firebase 모드에서는 subscribeEntries()의 실시간 구독이 entries/wastePresets를
   // 채우고 render()도 그쪽에서 호출하므로, 이 함수는 로컬(localStorage) 모드에서만 쓰인다.
@@ -1233,6 +1254,8 @@ async function loadEntries(){
     productWasteMap = rawProductMapObj ? sanitizeProductWasteMap(rawProductMapObj) : cloneProductWasteMap(DEFAULT_PRODUCT_WASTE_MAP);
     const rawCalConfig = localStorage.getItem(CALENDAR_CONFIG_STORAGE_KEY);
     calendarConfig = rawCalConfig ? sanitizeCalendarConfig(JSON.parse(rawCalConfig)) : { calendarId: '', apiKey: '' };
+    const rawDismissed = localStorage.getItem(DISMISSED_MISSING_STORAGE_KEY);
+    dismissedMissingKeys = sanitizeDismissedMissing(rawDismissed ? JSON.parse(rawDismissed) : null);
     if(hasLegacyPresetNames(rawPresetsList) || hasLegacyEntryMemos(rawEntriesList)){
       // 예전 폐용매 이름("EtOH+EA" 등)이 저장되어 있던 경우, 새 이름으로 교정한 내용을
       // 사용자 조작 없이 조용히 다시 저장해서 다음에도 새 이름으로 남도록 한다.
@@ -1243,6 +1266,7 @@ async function loadEntries(){
     wastePresets = DEFAULT_WASTE_PRESETS.slice();
     productWasteMap = cloneProductWasteMap(DEFAULT_PRODUCT_WASTE_MAP);
     calendarConfig = { calendarId: '', apiKey: '' };
+    dismissedMissingKeys = new Set();
   }
   render();
 }
@@ -1263,10 +1287,12 @@ function subscribeEntries(){
       const presetsFromDb = data && data.wastePresets;
       const productMapFromDb = data && data.productWasteMap;
       const calendarConfigFromDb = data && data.calendarConfig;
+      const dismissedFromDb = data && data.dismissedMissingKeys;
       entries = sanitizeEntries(rawEntriesList);
       wastePresets = Array.isArray(presetsFromDb) ? sanitizeWastePresets(presetsFromDb) : DEFAULT_WASTE_PRESETS.slice();
       productWasteMap = productMapFromDb ? sanitizeProductWasteMap(productMapFromDb) : cloneProductWasteMap(DEFAULT_PRODUCT_WASTE_MAP);
       calendarConfig = calendarConfigFromDb ? sanitizeCalendarConfig(calendarConfigFromDb) : { calendarId: '', apiKey: '' };
+      dismissedMissingKeys = sanitizeDismissedMissing(dismissedFromDb);
       render();
       if(hasLegacyPresetNames(presetsFromDb) || hasLegacyEntryMemos(rawEntriesList)){
         // 공유 저장소에 예전 폐용매 이름("EtOH+EA" 등)이 남아있던 경우, 새 이름으로
@@ -1284,7 +1310,7 @@ function subscribeEntries(){
 async function saveEntries(){
   if(useFirebase && firebaseDb){
     try{
-      await tonbagDocRef().set({ entries, wastePresets, productWasteMap, calendarConfig, updatedAt: Date.now() });
+      await tonbagDocRef().set({ entries, wastePresets, productWasteMap, calendarConfig, dismissedMissingKeys: Array.from(dismissedMissingKeys), updatedAt: Date.now() });
       // 화면 갱신은 subscribeEntries()의 onSnapshot이 처리한다
       // (다른 사람이 등록한 내용도 똑같은 방식으로 실시간 반영됨)
       return;
@@ -1299,8 +1325,34 @@ async function saveEntries(){
     localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(wastePresets));
     localStorage.setItem(PRODUCT_MAP_STORAGE_KEY, JSON.stringify(productWasteMap));
     localStorage.setItem(CALENDAR_CONFIG_STORAGE_KEY, JSON.stringify(calendarConfig));
+    localStorage.setItem(DISMISSED_MISSING_STORAGE_KEY, JSON.stringify(Array.from(dismissedMissingKeys)));
   }catch(e){
     document.getElementById('formHint').textContent = '저장 중 오류가 발생했습니다. (브라우저 저장공간이 가득 찼거나 시크릿 모드일 수 있어요)';
+  }
+}
+
+// "폐액 미기입" 배너의 체크박스를 눌렀을 때: 그 항목을 확인 완료 처리해서
+// 목록에서 즉시 사라지게 하고, 다른 미저장 변경사항("저장" 버튼을 아직 안 누른 것)에
+// 영향을 주지 않도록 saveEntries()의 dirty 흐름과는 별도로 이 값만 바로 저장한다.
+function toggleMissingDismissed(key){
+  dismissedMissingKeys.add(key);
+  persistDismissedMissing();
+  renderCalendarAlerts();
+}
+
+async function persistDismissedMissing(){
+  if(useFirebase && firebaseDb){
+    try{
+      await tonbagDocRef().set({ dismissedMissingKeys: Array.from(dismissedMissingKeys) }, { merge: true });
+    }catch(e){
+      console.error('[톤백 관리대장] 미기입 체크 저장 실패', e);
+    }
+    return;
+  }
+  try{
+    localStorage.setItem(DISMISSED_MISSING_STORAGE_KEY, JSON.stringify(Array.from(dismissedMissingKeys)));
+  }catch(e){
+    // 로컬 저장 실패는 조용히 무시 — 체크 표시 자체는 화면에서 이미 반영됨
   }
 }
 
@@ -1614,10 +1666,16 @@ function renderCalendarAlerts(){
   const missingList = collectMissingWasteEntries(days);
   const missingKey = (dOnly, code, solvent) => `${ymd(dOnly)}|${code}|${solvent}`;
   const missingSet = new Set(missingList.map(x => missingKey(x.date, x.code, x.solvent)));
+  // 체크박스로 "확인 완료" 처리한(dismissedMissingKeys) 항목은 배너 목록에서만 뺀다.
+  // (달력 칸의 "⚠ 미기입" 배지는 실제 입고 등록 여부를 그대로 보여줘야 하므로 missingSet은 건드리지 않는다)
+  const visibleMissingList = missingList.filter(x => !dismissedMissingKeys.has(missingKey(x.date, x.code, x.solvent)));
 
-  const missingBannerHtml = missingList.length
-    ? `<div class="alert-missing-banner">⚠ 폐액 미기입 ${missingList.length}건 — 아래 목록의 날짜에 예상된 폐용매가 아직 입고 등록되지 않았습니다: ${
-        missingList.map(x => `<span class="alert-missing-item">${formatDateLabel(x.date)} ${escapeHtml(x.code)}(${escapeHtml(x.solvent)})</span>`).join(' ')
+  const missingBannerHtml = visibleMissingList.length
+    ? `<div class="alert-missing-banner">⚠ 폐액 미기입 ${visibleMissingList.length}건 — 아래 목록의 날짜에 예상된 폐용매가 아직 입고 등록되지 않았습니다. 확인했으면 체크하세요: ${
+        visibleMissingList.map(x => {
+          const key = missingKey(x.date, x.code, x.solvent);
+          return `<label class="alert-missing-item"><input type="checkbox" class="alert-missing-checkbox" onchange="toggleMissingDismissed('${escapeHtml(key)}')"><span>${formatDateLabel(x.date)} ${escapeHtml(x.code)}(${escapeHtml(x.solvent)})</span></label>`;
+        }).join(' ')
       }</div>`
     : '';
 
