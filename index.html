@@ -1666,8 +1666,8 @@ function renderCalendarAlerts(){
   const missingList = collectMissingWasteEntries(days);
   const missingKey = (dOnly, code, solvent) => `${ymd(dOnly)}|${code}|${solvent}`;
   const missingSet = new Set(missingList.map(x => missingKey(x.date, x.code, x.solvent)));
-  // 체크박스로 "확인 완료" 처리한(dismissedMissingKeys) 항목은 배너 목록에서만 뺀다.
-  // (달력 칸의 "⚠ 미기입" 배지는 실제 입고 등록 여부를 그대로 보여줘야 하므로 missingSet은 건드리지 않는다)
+  // 체크박스로 "확인 완료" 처리한(dismissedMissingKeys) 항목은 배너 목록에서 뺄 뿐만 아니라,
+  // 달력 칸에 표시되는 "⚠ 미기입" / "사용 톤백 없음" 배지도 함께 숨긴다.
   const visibleMissingList = missingList.filter(x => !dismissedMissingKeys.has(missingKey(x.date, x.code, x.solvent)));
 
   const missingBannerHtml = visibleMissingList.length
@@ -1702,9 +1702,13 @@ function renderCalendarAlerts(){
       let solventsHtml = '';
       if(m.solvents && m.solvents.length){
         solventsHtml = m.solvents.map(s=>{
-          const isMissing = missingSet.has(missingKey(dOnly, m.code, s));
+          const cellKey = missingKey(dOnly, m.code, s);
+          const isDismissed = dismissedMissingKeys.has(cellKey);
+          const isMissing = !isDismissed && missingSet.has(cellKey);
           const missingBadge = isMissing ? `<span class="alert-missing-badge">⚠ 미기입</span>` : '';
-          return `<span class="alert-solvent-badge">${escapeHtml(s)}</span>${tonbagAvailabilityBadgeHtml(s)}${missingBadge}`;
+          // 체크박스로 확인 완료 처리된 항목은 "사용 톤백 없음" 배지도 함께 숨긴다.
+          const tonbagBadge = isDismissed ? '' : tonbagAvailabilityBadgeHtml(s);
+          return `<span class="alert-solvent-badge">${escapeHtml(s)}</span>${tonbagBadge}${missingBadge}`;
         }).join('');
       } else {
         solventsHtml = '';
