@@ -1711,7 +1711,6 @@ function renderCalendarAlerts(){
     const isOutside = dOnly < monthDate || dOnly >= nextMonth;
     const matches = matchEventsForDate(d);
     const cardsHtml = matches.map(m=>{
-      const dayNote = m.totalDays > 1 ? `${m.dayIndex}일차/${m.totalDays}일` : '';
       let solventsHtml = '';
       if(m.solvents && m.solvents.length){
         solventsHtml = m.solvents.map(s=>{
@@ -1719,15 +1718,18 @@ function renderCalendarAlerts(){
           const isDismissed = dismissedMissingKeys.has(cellKey);
           const isMissing = !isDismissed && missingSet.has(cellKey);
           const missingBadge = isMissing ? `<span class="alert-missing-badge">⚠ 미기입</span>` : '';
-          // 체크박스로 확인 완료 처리된 항목은 "사용 톤백 없음" 배지도 함께 숨긴다.
-          const tonbagBadge = isDismissed ? '' : tonbagAvailabilityBadgeHtml(s);
+          // 해당 날짜에 이미 그 폐용매로 입고(생산 완료) 등록이 끝난 경우에는
+          // "사용 가능 톤백" 용량 배지(예: 100L)를 더 보여줄 필요가 없으므로
+          // 숨긴다. 체크박스로 확인 완료 처리된 항목도 마찬가지로 숨긴다.
+          const alreadyEntered = hasEntryForDateSolvent(dOnly, s);
+          const tonbagBadge = (isDismissed || alreadyEntered) ? '' : tonbagAvailabilityBadgeHtml(s);
           return `<span class="alert-solvent-badge">${escapeHtml(s)}</span>${tonbagBadge}${missingBadge}`;
         }).join('');
       } else {
         solventsHtml = '';
       }
       return `<div class="cal-cell-card" title="${escapeHtml(m.title)}">
-        <div class="cal-cell-code">${escapeHtml(m.code)}${dayNote ? ` <span class="cal-cell-daynote">(${dayNote})</span>` : ''}</div>
+        <div class="cal-cell-code">${escapeHtml(m.code)}</div>
         ${solventsHtml ? `<div class="cal-solvents">${solventsHtml}</div>` : ''}
       </div>`;
     }).join('');
