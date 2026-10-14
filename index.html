@@ -1089,6 +1089,7 @@ let calendarFetchError = '';
 let calendarLastCheckedAt = null;
 let calendarAutoFetchDone = false; // 설정이 처음 로드됐을 때 한 번만 자동으로 불러오기 위한 플래그
 let calendarViewMonth = null; // 현재 달력에 표시 중인 달의 1일(Date). null이면 이번 달.
+let pendingCapEntryIds = new Set(); // 용량(기존수량)을 바꿨지만 아직 "저장"을 누르지 않은 입고내역 id — 저장 시점에 입고등록으로 인식한다
 let dismissedMissingKeys = new Set(); // "폐액 미기입" 목록에서 체크박스로 확인 처리한 항목(날짜|품목코드|폐용매) 키 모음
 let wasteManageOpen = false;
 let productManageOpen = false;
@@ -1605,7 +1606,7 @@ function hasEntryForDateSolvent(dateObj, solvent){
     if(e.date === key && e.memo === solvent) return true;
     // 입고내역에서 같은 폐용매 "사용" 톤백의 용량(L)을 바꿨다면, 그 폐액을 넣은 것으로 보고
     // 용량을 바꾼 날짜(포함) 이전에 예측된 미기입은 기입된 것으로 처리한다.
-    return e.type === 'half' && e.memo === solvent && !!e.capChangedDate && e.capChangedDate >= key;
+    return e.type === 'half' && e.memo === solvent && !!e.capChangedDate && e.capChangedDate >= key && !pendingCapEntryIds.has(e.id);
   });
 }
 
@@ -1643,6 +1644,11 @@ function updateCalendarStatusText(){
   } else {
     el.textContent = '';
   }
+}
+
+function getCalendarViewDays(){
+  const monthDate = calendarViewMonth || startOfMonth(dateOnly(new Date()));
+  return eachDateInRange(startOfGridForMonth(monthDate), endOfGridForMonth(monthDate));
 }
 
 function renderCalendarAlerts(){
@@ -1690,7 +1696,7 @@ function renderCalendarAlerts(){
   const visibleMissingList = missingList.filter(x => !dismissedMissingKeys.has(missingKey(x.date, x.code, x.solvent)));
 
   const missingBannerHtml = visibleMissingList.length
-    ? `<div class="alert-missing-banner">⚠ 폐액 미기입 ${visibleMissingList.length}건 — 아래 목록의 날짜에 예상된 폐용매가 아직 입고 등록되지 않았습니다. 확인했으면 체크하세요: ${
+    ? `<div class="alert-missing-banner">⚠ 폐액 미기입 ${visibleMissingList.length}건 — 입고등록을 했으면 체크하세요: ${
         visibleMissingList.map(x => {
           const key = missingKey(x.date, x.code, x.solvent);
           return `<label class="alert-missing-item"><input type="checkbox" class="alert-missing-checkbox" onchange="toggleMissingDismissed('${escapeHtml(key)}')"><span>${formatDateLabel(x.date)} ${escapeHtml(x.code)}(${escapeHtml(x.solvent)})</span></label>`;
@@ -2189,6 +2195,7 @@ async function submitEntry(){
     }
     const capChanged = currentType === 'half' && capacity !== entries[idx].capacity;
     entries[idx] = { ...entries[idx], date, type: currentType, qty, memo, capacity, ...(capChanged ? { capChangedDate: ymd(new Date()) } : {}) };
+    if(capChanged) pendingCapEntryIds.add(entries[idx].id);
     markDirty();
     exitEditMode();
   } else {
@@ -2246,6 +2253,7 @@ async function changeEntryCapacity(selectEl){
   if(newCapacity !== entry.capacity){
     // 용량이 실제로 바뀌면 "폐액을 넣었다"는 입력으로 인식해 변경 날짜를 기록한다 (미기입 해제용)
     entry.capChangedDate = ymd(new Date());
+    pendingCapEntryIds.add(entry.id); // 저장 버튼을 눌러야 입고등록으로 확정
   }
   entry.capacity = newCapacity;
   if(editingId === id){
@@ -2302,12 +2310,29 @@ async function handleSaveClick(){
   const hint = document.getElementById('formHint');
   if(hint) hint.textContent = '';
   btn.disabled = true;
+  // 용량(기존수량)을 바꾼 항목이 있으면, 저장하는 순간 "입고등록"으로 인식하고
+  // 그 때문에 해결되는 미기입 항목은 체크(입고함) 처리한다.
+  const pendingBackup = new Set(pendingCapEntryIds);
+  const dismissedBackup = new Set(dismissedMissingKeys);
+  if(pendingCapEntryIds.size){
+    const days = getCalendarViewDays();
+    const keyOf = x => `${ymd(x.date)}|${x.code}|${x.solvent}`;
+    const before = new Set(collectMissingWasteEntries(days).map(keyOf));
+    pendingCapEntryIds.clear();
+    collectMissingWasteEntries(days).forEach(x => before.delete(keyOf(x)));
+    before.forEach(k => dismissedMissingKeys.add(k));
+  }
   await saveEntries();
   btn.disabled = false;
   // saveEntries()는 실패하면 formHint에 오류 메시지를 남긴다 — 그 경우엔 아직 저장되지
   // 않은 것이므로 isDirty를 유지하고, "저장됨" 표시 대신 그 오류 메시지가 보이게 둔다.
   const failed = hint && hint.textContent;
-  if(!failed){
+  if(failed){
+    // 저장 실패 시에는 입고등록 인식/체크도 되돌린다
+    pendingBackup.forEach(id => pendingCapEntryIds.add(id));
+    dismissedMissingKeys = dismissedBackup;
+  } else {
+    renderCalendarAlerts();
     isDirty = false;
     clearTimeout(saveClickTimer);
     btn.classList.remove('dirty');
